@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import styles from './DesignSettingsModal.module.css';
 
 export interface ThemeSettings {
-  emptyCellColor: string;
   weekendColor: string;
   shiftColor: string;
   pavilionColor: string;
@@ -14,7 +13,6 @@ export interface ThemeSettings {
 }
 
 export const DEFAULT_THEME: ThemeSettings = {
-  emptyCellColor: '#121212',
   weekendColor: '#121212',
   shiftColor: '#1c1c1e',
   pavilionColor: '#2d1b4e',
@@ -48,10 +46,6 @@ export const DesignSettingsModal = ({ isOpen, onClose, onSave, initialSettings }
           <button className={styles.closeBtn} onClick={onClose}>&times;</button>
         </div>
         <div className={styles.body}>
-          <div className={styles.field}>
-            <label>Пустая ячейка</label>
-            <input type="color" value={settings.emptyCellColor} onChange={e => handleChange('emptyCellColor', e.target.value)} />
-          </div>
           <div className={styles.field}>
             <label>Выходной / Отсыпной</label>
             <input type="color" value={settings.weekendColor} onChange={e => handleChange('weekendColor', e.target.value)} />
