@@ -365,7 +365,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                     }}
                     onMouseDown={() => handleMouseDown(virtualRow.index, actualColIndex)}
                     onMouseEnter={() => handleMouseEnter(virtualRow.index, actualColIndex)}
-                    onDoubleClick={() => setActiveCell({ rowIndex: virtualRow.index, colIndex: actualColIndex })}
+                    onClick={() => setActiveCell({ rowIndex: virtualRow.index, colIndex: actualColIndex })}
                   >
                     {/* Add a translucent background over custom color if selected */}
                     {selected && mappedColor && (
