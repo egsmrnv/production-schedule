@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { apiClient } from '../../api/client';
+import { CellSettingsModal, StructuredData } from './CellSettingsModal';
 import styles from './DataGrid.module.css';
 
 interface Column {
@@ -11,6 +12,7 @@ interface Column {
 
 interface Row {
   date: string;
+  rawDate: string;
   data: Record<string, CellData>;
 }
 
@@ -31,11 +33,12 @@ export interface DataGridProps {
   highlightText?: string;
   highlightColor?: string;
   highlightColumnId?: string;
+  staffList?: string[];
 }
 
 const getDarkThemeColor = (color: string) => {
   const c = color.toLowerCase();
-  if (c === '#cccccc') return '#3a3a3c'; // Grey
+  if (c === '#cccccc') return '#161618'; // Extremely dark grey for weekends
   if (c === '#b6d7a8') return '#1e4620'; // Deep Green
   if (c === '#fff2cc') return '#5c4008'; // Deep Yellow
   if (c === '#efefef') return '#2c2c2e'; // Light Grey -> Darker Grey
@@ -49,7 +52,8 @@ export const DataGrid: React.FC<DataGridProps> = ({
   onDataLoaded, 
   highlightText, 
   highlightColor, 
-  highlightColumnId 
+  highlightColumnId,
+  staffList = []
 }) => {
   const [columns, setColumns] = useState<Column[]>([
     { id: 'date', name: 'Дата', width: 100 }
@@ -57,6 +61,8 @@ export const DataGrid: React.FC<DataGridProps> = ({
 
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  const [activeCell, setActiveCell] = useState<{rowIndex: number, colIndex: number} | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -80,6 +86,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
           const displayDate = parts.length === 3 ? `${parts[2]}.${parts[1]}` : d.date;
           return {
             date: displayDate,
+            rawDate: d.date,
             data: d.data
           };
         });
@@ -358,12 +365,17 @@ export const DataGrid: React.FC<DataGridProps> = ({
                     }}
                     onMouseDown={() => handleMouseDown(virtualRow.index, actualColIndex)}
                     onMouseEnter={() => handleMouseEnter(virtualRow.index, actualColIndex)}
+                    onDoubleClick={() => setActiveCell({ rowIndex: virtualRow.index, colIndex: actualColIndex })}
                   >
                     {/* Add a translucent background over custom color if selected */}
                     {selected && mappedColor && (
                       <div className={styles.selectionOverlay} style={{ backgroundColor: mappedColor }}></div>
                     )}
-                    <span className={styles.cellText}>{cellData.text}</span>
+                    <span className={styles.cellText}>
+                      {cellData.staff && cellData.staff.length > 0 ? cellData.staff.join(', ') : cellData.text}
+                      {cellData.cars && cellData.cars.length > 0 && ' 🚗'}
+                      {cellData.dayType && ` [${cellData.dayType}]`}
+                    </span>
                   </div>
                 );
               })}
@@ -371,6 +383,42 @@ export const DataGrid: React.FC<DataGridProps> = ({
           );
         })}
       </div>
+
+      {/* Cell Settings Modal */}
+      {activeCell && (
+        <CellSettingsModal
+          isOpen={true}
+          onClose={() => setActiveCell(null)}
+          staffList={staffList}
+          date={rows[activeCell.rowIndex].date}
+          columnName={columns[activeCell.colIndex].name}
+          initialData={rows[activeCell.rowIndex].data[columns[activeCell.colIndex].id] || {}}
+          onSave={async (newData) => {
+            const row = rows[activeCell.rowIndex];
+            const col = columns[activeCell.colIndex];
+            
+            const isoDate = row.rawDate;
+            const fullData = { ...row.data, [col.id]: newData };
+
+            try {
+              await apiClient.put('/schedule', {
+                date: isoDate,
+                data: fullData
+              });
+              
+              // Update local state
+              const newRows = [...rows];
+              newRows[activeCell.rowIndex] = { ...row, data: fullData };
+              setRows(newRows);
+              setActiveCell(null);
+            } catch (err) {
+              console.error('Failed to save cell data', err);
+              alert('Ошибка сохранения');
+            }
+          }}
+        />
+      )}
+
     </div>
   );
 };

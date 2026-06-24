@@ -76,6 +76,7 @@ export const AdminBoard: React.FC = () => {
             highlightText={highlight.text}
             highlightColor={highlight.color}
             highlightColumnId={highlight.columnId}
+            staffList={staffList}
           />
         </section>
         <aside className={styles.sidebar}>
