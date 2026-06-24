@@ -8,7 +8,7 @@ async function main() {
   console.log('Seeding database...');
 
   // Create an admin user
-  const adminPassword = 'admin'; // Change in production!
+  const adminPassword = process.env.ADMIN_PASSWORD || crypto.randomBytes(12).toString('hex');
   const passwordHash = await bcrypt.hash(adminPassword, 10);
   
   const admin = await prisma.user.upsert({
@@ -57,7 +57,7 @@ async function main() {
   });
 
   console.log('Seed completed successfully.');
-  console.log(`Admin login: Admin / admin`);
+  console.log(`Admin login: Admin / ${adminPassword}`);
   console.log(`Staff access link: http://localhost:5173/my-calendar?token=${staffToken}`);
 }
 
