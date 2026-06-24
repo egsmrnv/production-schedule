@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { apiClient } from '../../api/client';
 import { CellSettingsModal } from './CellSettingsModal';
+import { ColumnSettingsModal } from './ColumnSettingsModal';
 import { type ThemeSettings, DEFAULT_THEME } from './DesignSettingsModal';
 import styles from './DataGrid.module.css';
 
@@ -101,6 +101,8 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const [activeCell, setActiveCell] = useState<{rowIndex: number, colIndex: number} | null>(null);
+  const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
+  const [shouldReload, setShouldReload] = useState(0);
   const [collapsedMonths, setCollapsedMonths] = useState<Record<string, boolean>>({});
 
   const todayStrForCalc = React.useMemo(() => {
@@ -183,7 +185,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
       }
     };
     loadData();
-  }, [onDataLoaded]);
+  }, [onDataLoaded, shouldReload]);
 
   const parentRef = useRef<HTMLDivElement>(null);
   
@@ -373,13 +375,47 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const totalWidth = columns.reduce((acc, col) => acc + col.width, 0);
   const dataColumns = columns.slice(1);
 
+  const handleSaveColumns = async (newCols: Column[], deletedIds: string[], addedCols: {name: string, order: number}[]) => {
+    for (const id of deletedIds) {
+      await apiClient.delete(`/columns/${id}`);
+    }
+    const idMap: Record<string, string> = {};
+    for (const c of addedCols) {
+      const res = await apiClient.post('/columns', { name: c.name, order: c.order });
+      idMap[c.name] = res.data.id;
+    }
+    const updates = newCols.map((c, i) => ({
+      id: c.id.startsWith('new-') ? idMap[c.name] : c.id,
+      order: i
+    }));
+    await apiClient.put('/columns/reorder', updates);
+    setShouldReload(prev => prev + 1);
+  };
+
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
+  const gridItemsRef = useRef(gridItems);
+  useEffect(() => {
+    gridItemsRef.current = gridItems;
+  }, [gridItems]);
+
   const scrollToToday = () => {
-    const todayIndex = gridItems.findIndex(item => item.type === 'row' && item.row.rawDate === todayStr);
-    if (todayIndex !== -1) {
-      rowVirtualizer.scrollToIndex(todayIndex, { align: 'center' });
+    const todayMonthKey = todayStr.substring(0, 7);
+    
+    const performScroll = () => {
+      const latestItems = gridItemsRef.current;
+      const todayIndex = latestItems.findIndex(item => item.type === 'row' && item.row.rawDate === todayStr);
+      if (todayIndex !== -1) {
+        rowVirtualizer.scrollToIndex(todayIndex, { align: 'center' });
+      }
+    };
+
+    if (collapsedMonths[todayMonthKey]) {
+      setCollapsedMonths(prev => ({ ...prev, [todayMonthKey]: false }));
+      setTimeout(performScroll, 50);
+    } else {
+      performScroll();
     }
   };
 
@@ -404,10 +440,11 @@ export const DataGrid: React.FC<DataGridProps> = ({
             <div 
               key={col.id} 
               className={styles.headerCell} 
-              onClick={index === 0 ? scrollToToday : undefined}
+              onClick={index === 0 ? scrollToToday : () => setIsColumnModalOpen(true)}
               style={{ 
                 width: col.width,
-                ...(index === 0 ? { position: 'sticky', left: 0, zIndex: 21, backgroundColor: 'var(--panel-bg)', borderRight: '1px solid var(--border-color)', cursor: 'pointer' } : {})
+                cursor: 'default',
+                ...(index === 0 ? { position: 'sticky', left: 0, zIndex: 21, backgroundColor: 'var(--panel-bg)', borderRight: '1px solid var(--border-color)' } : {})
               }}
             >
               {col.name}
@@ -460,7 +497,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 {/* Date Cell (Sticky) */}
                 <div 
                   className={`${styles.cell} ${styles.dateCell}`}
-                  style={{ width: columns[0].width, cursor: 'pointer' }}
+                  style={{ width: columns[0].width, cursor: 'default' }}
                   onClick={scrollToToday}
                 >
                   {row.date}
@@ -582,6 +619,13 @@ export const DataGrid: React.FC<DataGridProps> = ({
         />
       )}
 
+      {/* Column Settings Modal */}
+      <ColumnSettingsModal
+        isOpen={isColumnModalOpen}
+        onClose={() => setIsColumnModalOpen(false)}
+        columns={columns.slice(1)}
+        onSave={handleSaveColumns}
+      />
     </div>
   );
 };

@@ -126,7 +126,7 @@
   display: flex;
   background-color: var(--panel-bg);
   border-bottom: 1px solid var(--border-color);
-  cursor: pointer;
+  cursor: default;
   z-index: 19;
 }
 

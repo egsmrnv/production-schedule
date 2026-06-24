@@ -106,6 +106,28 @@ app.post('/api/columns', requireAdmin, async (req, res) => {
   }
 });
 
+app.put('/api/columns/reorder', requireAdmin, async (req, res) => {
+  try {
+    const columns: { id: string, order: number }[] = req.body;
+    if (!Array.isArray(columns)) {
+      return res.status(400).json({ error: 'Expected array of columns' });
+    }
+    
+    const updates = columns.map(c => 
+      prisma.projectColumn.update({
+        where: { id: c.id },
+        data: { order: c.order }
+      })
+    );
+    
+    await prisma.$transaction(updates);
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 app.delete('/api/columns/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
