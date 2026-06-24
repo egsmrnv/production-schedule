@@ -4,6 +4,7 @@ import { apiClient } from '../../api/client';
 import styles from './AdminBoard.module.css';
 import { DataGrid } from '../../components/Grid/DataGrid';
 import { DesignSettingsModal, type ThemeSettings, DEFAULT_THEME } from '../../components/Grid/DesignSettingsModal';
+import { ProjectSettingsModal, type ProjectData } from '../../components/Grid/ProjectSettingsModal';
 
 export const AdminBoard: React.FC = () => {
   const navigate = useNavigate();
@@ -11,12 +12,14 @@ export const AdminBoard: React.FC = () => {
   const gridRef = useRef<{ addColumn: () => void } | null>(null);
 
   const [staffList, setStaffList] = useState<any[]>([]);
-  const [projects, setProjects] = useState<any[]>([]);
+  const [globalProjects, setGlobalProjects] = useState<ProjectData[]>([]);
   const [cars, setCars] = useState<any[]>([]);
   const [highlight, setHighlight] = useState<{ text?: string, color?: string, columnId?: string }>({});
   
   const [themeSettings, setThemeSettings] = useState<ThemeSettings>(DEFAULT_THEME);
   const [isDesignModalOpen, setIsDesignModalOpen] = useState(false);
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<ProjectData | null>(null);
   const [collapsed, setCollapsed] = useState({ cars: false, projects: false, staff: false });
 
   const toggleCollapse = (key: 'cars' | 'projects' | 'staff') => {
@@ -25,13 +28,15 @@ export const AdminBoard: React.FC = () => {
 
   const fetchData = useCallback(async () => {
     try {
-      const [staffRes, carsRes, settingsRes] = await Promise.all([
+      const [staffRes, carsRes, settingsRes, projectsRes] = await Promise.all([
         apiClient.get('/admin/staff'),
         apiClient.get('/admin/cars'),
-        apiClient.get('/settings')
+        apiClient.get('/settings'),
+        apiClient.get('/admin/projects')
       ]);
       setStaffList(staffRes.data);
       setCars(carsRes.data);
+      setGlobalProjects(projectsRes.data);
       if (settingsRes.data && Object.keys(settingsRes.data).length > 0) {
         setThemeSettings({ ...DEFAULT_THEME, ...settingsRes.data });
       }
@@ -43,10 +48,6 @@ export const AdminBoard: React.FC = () => {
   React.useEffect(() => {
     if (token) fetchData();
   }, [token, fetchData]);
-
-  const handleDataLoaded = useCallback((cols: any[]) => {
-    setProjects(cols.filter(c => c.id !== 'date'));
-  }, []);
 
   if (!token) {
     return <Navigate to="/login" replace />;
@@ -86,18 +87,25 @@ export const AdminBoard: React.FC = () => {
     fetchData();
   };
 
-  const handleAddProject = async () => {
-    const name = prompt('Название проекта:');
-    if (!name) return;
-    await apiClient.post('/columns', { name, order: projects.length });
-    window.location.reload();
+  const handleAddProject = () => {
+    setEditingProject(null);
+    setIsProjectModalOpen(true);
   };
 
-  const handleDeleteProject = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!window.confirm('Точно удалить проект? Все данные колонки будут утеряны.')) return;
-    await apiClient.delete(`/columns/${id}`);
-    window.location.reload();
+  const handleSaveProject = async (project: ProjectData) => {
+    if (project.id) {
+      await apiClient.put(`/admin/projects/${project.id}`, project);
+    } else {
+      await apiClient.post('/admin/projects', project);
+    }
+    setIsProjectModalOpen(false);
+    fetchData();
+  };
+
+  const handleDeleteProject = async (id: string) => {
+    await apiClient.delete(`/admin/projects/${id}`);
+    setIsProjectModalOpen(false);
+    fetchData();
   };
 
   const handleSaveDesign = async (newSettings: ThemeSettings) => {
@@ -121,12 +129,12 @@ export const AdminBoard: React.FC = () => {
         <section className={styles.gridArea}>
           <DataGrid 
             gridRef={gridRef}
-            onDataLoaded={handleDataLoaded}
             highlightText={highlight.text}
             highlightColor={highlight.color}
             highlightColumnId={highlight.columnId}
             staffList={staffList.map(s => s.name)}
             cars={cars}
+            globalProjects={globalProjects}
             themeSettings={themeSettings}
           />
         </section>
@@ -170,14 +178,13 @@ export const AdminBoard: React.FC = () => {
             </div>
             {!collapsed.projects && (
               <ul className={styles.legendList} style={{ marginTop: '10px' }}>
-                {projects.map(p => (
+                {globalProjects.map(p => (
                   <li 
                     key={p.id} 
-                    style={{ cursor: 'pointer', opacity: highlight.columnId === p.id ? 1 : 0.7 }}
-                    onClick={() => setHighlight({ columnId: p.id })}
+                    style={{ cursor: 'pointer', borderLeft: `4px solid ${p.color}`, paddingLeft: '8px' }}
+                    onClick={() => { setEditingProject(p); setIsProjectModalOpen(true); }}
                   >
                     <span style={{flex: 1}}>{p.name}</span>
-                    <button onClick={(e) => handleDeleteProject(p.id, e)} style={{ color: 'var(--danger-color)', padding: '0 5px' }}>🗑</button>
                   </li>
                 ))}
               </ul>
@@ -227,6 +234,14 @@ export const AdminBoard: React.FC = () => {
         onClose={() => setIsDesignModalOpen(false)}
         initialSettings={themeSettings}
         onSave={handleSaveDesign}
+      />
+      
+      <ProjectSettingsModal
+        isOpen={isProjectModalOpen}
+        project={editingProject}
+        onClose={() => setIsProjectModalOpen(false)}
+        onSave={handleSaveProject}
+        onDelete={handleDeleteProject}
       />
     </div>
   );

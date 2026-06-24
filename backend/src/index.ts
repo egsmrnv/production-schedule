@@ -156,6 +156,45 @@ app.delete('/api/columns/:id', requireAdmin, async (req, res) => {
 });
 
 // --- Admin Entity Management ---
+app.get('/api/admin/projects', requireAdmin, async (req, res) => {
+  const projects = await prisma.project.findMany();
+  res.json(projects);
+});
+
+app.post('/api/admin/projects', requireAdmin, async (req, res) => {
+  const { name, color } = req.body;
+  try {
+    const project = await prisma.project.create({ data: { name, color: color || '#0a84ff' } });
+    res.json(project);
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.put('/api/admin/projects/:id', requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { name, color } = req.body;
+  try {
+    const project = await prisma.project.update({ where: { id }, data: { name, color } });
+    res.json(project);
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.delete('/api/admin/projects/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.project.delete({ where: { id } });
+    // Note: We intentionally do not cascade delete project assignments from scheduleData
+    // to allow historical data to keep using the old name/color fallback if the project is deleted.
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 app.get('/api/admin/staff', requireAdmin, async (req, res) => {
   const staff = await prisma.user.findMany({ where: { role: 'STAFF' } });
   res.json(staff);

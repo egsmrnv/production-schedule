@@ -28,6 +28,8 @@ interface CellData {
   options?: string[];
   cellType?: string;
   projectName?: string;
+  projectId?: string;
+  comment?: string;
 }
 
 interface Selection {
@@ -100,6 +102,7 @@ export interface DataGridProps {
   highlightColumnId?: string;
   staffList?: string[];
   cars?: any[];
+  globalProjects?: any[];
   themeSettings?: ThemeSettings;
   gridRef?: React.RefObject<{ addColumn: () => void } | null>;
 }
@@ -113,6 +116,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
   highlightColumnId,
   staffList = [],
   cars = [],
+  globalProjects = [],
   themeSettings = DEFAULT_THEME,
   gridRef,
 }) => {
@@ -158,11 +162,11 @@ export const DataGrid: React.FC<DataGridProps> = ({
 
   // Per-column active-project tracking (O(columns × rows))
   const activeProjectsContext = useMemo(() => {
-    const ctx: Record<string, ({ name: string; color: string } | null)[]> = {};
+    const ctx: Record<string, ({ name: string; color: string; comment?: string } | null)[]> = {};
     for (const col of columns) {
       if (col.id === 'date') continue;
-      const colCtx: ({ name: string; color: string } | null)[] = new Array(rows.length).fill(null);
-      let activeProj: { name: string; color: string } | null = null;
+      const colCtx: ({ name: string; color: string; comment?: string } | null)[] = new Array(rows.length).fill(null);
+      let activeProj: { name: string; color: string; comment?: string } | null = null;
       rows.forEach((row, i) => {
         colCtx[i] = activeProj;
         const cell = row.data[col.id] as CellData | undefined;
@@ -175,9 +179,11 @@ export const DataGrid: React.FC<DataGridProps> = ({
             !cell.text.startsWith('Выходной') && !cell.text.startsWith('Отсыпной') &&
             cell.text !== '— СТОП —');
         if (isProjectStart) {
+          const globalProj = globalProjects.find(p => p.id === cell.projectId);
           activeProj = {
-            name: cell.projectName || cell.text || 'Новый проект',
-            color: cell.color || 'var(--primary-color)',
+            name: globalProj ? globalProj.name : (cell.projectName || cell.text || 'Новый проект'),
+            color: globalProj ? globalProj.color : (cell.color || 'var(--primary-color)'),
+            comment: cell.comment
           };
         } else if (cell.cellType === 'stop' || cell.dayType === 'стоп' || cell.text === 'СТОП' || cell.text === '— СТОП —') {
           activeProj = null;
@@ -559,7 +565,10 @@ export const DataGrid: React.FC<DataGridProps> = ({
                     // Project overlay covers the entire header cell
                     <div style={{ position: 'absolute', inset: 0, backgroundColor: 'var(--panel-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 22 }}>
                       <div style={{ position: 'absolute', inset: 0, backgroundColor: activeProjForHeader.color, opacity: 0.15, pointerEvents: 'none' }} />
-                      <span style={{ position: 'relative', fontWeight: 500, color: 'var(--text-primary)', pointerEvents: 'none' }}>{activeProjForHeader.name}</span>
+                      <span style={{ position: 'relative', fontWeight: 500, color: 'var(--text-primary)', pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {activeProjForHeader.name}
+                        {activeProjForHeader.comment && <span style={{ opacity: 0.7, fontSize: '0.9em' }}>({activeProjForHeader.comment})</span>}
+                      </span>
                       <button
                         onClick={e => { e.stopPropagation(); handleDeleteColumn(col.id); }}
                         style={{ position: 'absolute', right: '8px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '14px', opacity: 0.5 }}
@@ -704,6 +713,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
             onClose={() => setActiveCell(null)}
             staffList={staffList}
             cars={cars}
+            globalProjects={globalProjects}
             date={item.row.date}
             columnName={col.name}
             initialData={(item.row.data[col.id] as StructuredData) || {}}

@@ -5,7 +5,9 @@ import styles from './CellSettingsModal.module.css';
 
 export interface StructuredData {
   cellType?: 'project_start' | 'shift' | 'day_off' | 'stop' | '';
-  projectName?: string;
+  projectId?: string;
+  comment?: string;
+  projectName?: string; // Legacy fallback
   text?: string;
   color?: string;
   staff?: string[];
@@ -23,7 +25,8 @@ interface CellSettingsModalProps {
   columnName: string; // kept for API compat, not rendered
   staffList: string[];
   cars: any[];
-  activeProject: { name: string; color: string } | null;
+  globalProjects: any[]; // ProjectData[]
+  activeProject: { name: string; color: string; comment?: string } | null;
 }
 
 // ─── Constants (module-level, never re-created) ────────────────────────────────
@@ -46,7 +49,7 @@ const detectLegacyCellType = (d: StructuredData, hasActiveProject: boolean): Str
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
-  isOpen, onClose, onSave, initialData, date, staffList, cars, activeProject,
+  isOpen, onClose, onSave, initialData, date, staffList, cars, globalProjects, activeProject,
 }) => {
   const [data, setData] = useState<StructuredData>({});
 
@@ -83,6 +86,8 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
     setData({
       ...initialData,
       cellType: type,
+      projectId: initialData.projectId ?? '',
+      comment: initialData.comment ?? '',
       projectName: initialData.projectName ?? (type === 'project_start' ? initialData.text : ''),
       staff: parsedStaff,
       cars: parsedCars,
@@ -144,8 +149,14 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
     let color = data.color ?? '';
 
     if (data.cellType === 'project_start') {
-      text = data.projectName?.trim() || 'Новый проект';
-      if (!color) color = PROJECT_COLORS[Math.floor(Math.random() * PROJECT_COLORS.length)];
+      const proj = globalProjects.find(p => p.id === data.projectId);
+      if (proj) {
+        text = proj.name;
+        color = proj.color;
+      } else {
+        text = data.projectName || 'Новый проект';
+        color = data.color || PROJECT_COLORS[Math.floor(Math.random() * PROJECT_COLORS.length)];
+      }
     } else if (data.cellType === 'stop') {
       text = 'СТОП';
     } else if (data.cellType === 'day_off') {
@@ -196,30 +207,28 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
           {data.cellType === 'project_start' && (
             <>
               <div className={styles.formGroup}>
-                <label>Название проекта</label>
+                <label>Проект</label>
+                <select
+                  className={styles.select}
+                  value={data.projectId || ''}
+                  onChange={e => setData(prev => ({ ...prev, projectId: e.target.value }))}
+                >
+                  <option value="" disabled>(Выберите проект)</option>
+                  {globalProjects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className={styles.formGroup}>
+                <label>Комментарий к проекту</label>
                 <input
                   type="text"
                   className={styles.select}
                   style={{ width: '100%', padding: '8px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
-                  placeholder="Введите название проекта..."
-                  value={data.projectName || ''}
-                  onChange={e => setData(prev => ({ ...prev, projectName: e.target.value }))}
+                  placeholder="Например, номер счёта, статус..."
+                  value={data.comment || ''}
+                  onChange={e => setData(prev => ({ ...prev, comment: e.target.value }))}
                 />
-              </div>
-              <div className={styles.formGroup}>
-                <label>Цвет проекта</label>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {PROJECT_COLORS.map(c => (
-                    <div
-                      key={c}
-                      onClick={() => setData(prev => ({ ...prev, color: c }))}
-                      style={{
-                        width: '24px', height: '24px', borderRadius: '4px', backgroundColor: c, cursor: 'pointer',
-                        border: data.color === c ? '2px solid var(--text-primary)' : '1px solid var(--border-color)',
-                      }}
-                    />
-                  ))}
-                </div>
               </div>
             </>
           )}
