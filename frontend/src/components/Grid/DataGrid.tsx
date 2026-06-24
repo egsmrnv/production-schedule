@@ -490,11 +490,23 @@ export const DataGrid: React.FC<DataGridProps> = ({
         <div className={styles.headerRow}>
           {(() => {
             const virtualItems = rowVirtualizer.getVirtualItems();
-            // Skip month-header virtual rows — find the first visible *data* row
-            // so the sticky project overlay never falls back to row 0 by mistake
+            // Find the first *data* row whose bottom edge is actually at or below
+            // the top of the visible area (scrollOffset + 40px header height).
+            // Using the first virtualItem is wrong — it includes overscan rows
+            // rendered above the viewport, which causes the header to lag by up
+            // to `overscan` rows.
+            const scrollTop = (parentRef.current?.scrollTop ?? 0) + 40; // +40 for header
             const topOriginalIndex = (() => {
               for (const vi of virtualItems) {
                 const item = gridItems[vi.index];
+                if (item?.type !== 'row') continue;
+                // vi.start is the top edge of the row, vi.start + vi.size is the bottom edge
+                // We want the first row that is "entering" the viewport from the top
+                if (vi.start + vi.size > scrollTop) return item.originalIndex;
+              }
+              // Fallback: last row in list
+              for (let i = virtualItems.length - 1; i >= 0; i--) {
+                const item = gridItems[virtualItems[i].index];
                 if (item?.type === 'row') return item.originalIndex;
               }
               return 0;
