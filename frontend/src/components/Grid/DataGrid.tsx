@@ -348,13 +348,15 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 const cellData = row.data[col.id] || { text: '', color: '' };
                 const selected = isCellSelected(virtualRow.index, actualColIndex);
                 
-                const hasLegacyText = cellData.text && !['Выходной', 'Отсыпной'].includes(cellData.text.trim()) && cellData.text.trim().length > 0;
+                const hasLegacyText = cellData.text && !['Выходной', 'Отсыпной', 'СТОП'].includes(cellData.text.trim()) && cellData.text.trim().length > 0;
                 const isWorkingShift = cellData.staff?.length || cellData.dayType || cellData.cars?.length || hasLegacyText;
                 const isWeekend = cellData.text === 'Выходной' || cellData.dayType === 'выходной' || cellData.text === 'Отсыпной' || cellData.dayType === 'отсыпной';
+                const isStop = cellData.text === 'СТОП' || cellData.dayType === 'стоп';
                 
                 let mappedColor = cellData.color ? getDarkThemeColor(cellData.color) : undefined;
                 if (!mappedColor) {
                   if (isWeekend) mappedColor = themeSettings.weekendColor;
+                  else if (isStop) mappedColor = themeSettings.stopColor;
                   else if (cellData.dayType === 'павильон') mappedColor = themeSettings.pavilionColor;
                   else if (cellData.dayType === 'склад') mappedColor = themeSettings.warehouseColor;
                   else if (cellData.dayType === 'переезд') mappedColor = themeSettings.transferColor;
@@ -397,7 +399,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                     <span className={styles.cellText}>
                       {cellData.staff && cellData.staff.length > 0 ? cellData.staff.join(', ') : cellData.text}
                       {cellData.cars && cellData.cars.length > 0 && ' 🚗'}
-                      {cellData.dayType && cellData.dayType !== 'выходной' && cellData.dayType !== 'отсыпной' && ` [${cellData.dayType}]`}
+                      {cellData.dayType && cellData.dayType !== 'выходной' && cellData.dayType !== 'отсыпной' && cellData.dayType !== 'стоп' && ` [${cellData.dayType}]`}
                     </span>
                   </div>
                 );

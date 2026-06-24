@@ -25,7 +25,7 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
   isOpen, onClose, onSave, initialData, date, columnName, staffList, cars
 }) => {
 
-  const dayTypeOptions = ['натура', 'павильон', 'склад', 'переезд', 'выходной', 'отсыпной'];
+  const dayTypeOptions = ['натура', 'павильон', 'склад', 'переезд', 'выходной', 'отсыпной', 'стоп'];
   const extraOptions = ['погрузка', 'разгрузка'];
 
   const [data, setData] = useState<StructuredData>({});
@@ -129,6 +129,7 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
     let text = '';
     if (data.dayType === 'выходной') text = 'Выходной';
     else if (data.dayType === 'отсыпной') text = 'Отсыпной';
+    else if (data.dayType === 'стоп') text = 'СТОП';
     else {
       text = data.staff && data.staff.length > 0 ? data.staff.join(' ') : (data.text || '');
       if (data.dayType) text += ` [${data.dayType}]`;
@@ -148,14 +149,14 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
   const handleDayTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newDayType = e.target.value;
     setData(prev => {
-      if (newDayType === 'выходной' || newDayType === 'отсыпной') {
+      if (newDayType === 'выходной' || newDayType === 'отсыпной' || newDayType === 'стоп') {
         return { ...prev, dayType: newDayType, staff: [], cars: [], options: [] };
       }
       return { ...prev, dayType: newDayType };
     });
   };
 
-  const isWeekendOrOff = data.dayType === 'выходной' || data.dayType === 'отсыпной';
+  const isWeekendOrOff = data.dayType === 'выходной' || data.dayType === 'отсыпной' || data.dayType === 'стоп';
   const disabledStyle = isWeekendOrOff ? { opacity: 0.5, pointerEvents: 'none' as const } : {};
 
   return (

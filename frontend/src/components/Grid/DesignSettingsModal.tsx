@@ -8,6 +8,7 @@ export interface ThemeSettings {
   pavilionColor: string;
   warehouseColor: string;
   transferColor: string;
+  stopColor: string;
 }
 
 export const DEFAULT_THEME: ThemeSettings = {
@@ -16,7 +17,8 @@ export const DEFAULT_THEME: ThemeSettings = {
   shiftColor: '#1c1c1e',
   pavilionColor: '#2d1b4e',
   warehouseColor: '#3c2b1e',
-  transferColor: '#1e3c3c'
+  transferColor: '#1e3c3c',
+  stopColor: '#660000'
 };
 
 export const DesignSettingsModal = ({ isOpen, onClose, onSave, initialSettings }: any) => {
@@ -65,6 +67,10 @@ export const DesignSettingsModal = ({ isOpen, onClose, onSave, initialSettings }
           <div className={styles.field}>
             <label>Смена (Переезд)</label>
             <input type="color" value={settings.transferColor} onChange={e => handleChange('transferColor', e.target.value)} />
+          </div>
+          <div className={styles.field}>
+            <label>СТОП</label>
+            <input type="color" value={settings.stopColor} onChange={e => handleChange('stopColor', e.target.value)} />
           </div>
         </div>
         <div className={styles.footer}>
