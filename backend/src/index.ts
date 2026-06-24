@@ -11,8 +11,9 @@ const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecret';
+const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:2626';
 
-app.use(cors());
+app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.json());
 
 // --- Admin Authentication ---
