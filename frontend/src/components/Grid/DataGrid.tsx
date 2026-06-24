@@ -111,6 +111,27 @@ export const DataGrid: React.FC<DataGridProps> = ({
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   }, []);
 
+  const activeProjectsContext = React.useMemo(() => {
+    const context: Record<string, (string | null)[]> = {};
+    columns.forEach(c => {
+      if (c.id === 'date') return;
+      context[c.id] = new Array(rows.length).fill(null);
+      let activeProj: string | null = null;
+      rows.forEach((row, i) => {
+        context[c.id][i] = activeProj;
+        const cell = row.data[c.id];
+        if (cell) {
+          if (cell.cellType === 'project_start' || (cell.projectName && !cell.cellType) || (cell.text && !activeProj && !cell.staff?.length && !cell.cars?.length && cell.text !== 'Выходной' && cell.text !== 'Отсыпной' && cell.text !== 'СТОП')) {
+             activeProj = cell.projectName || cell.text || 'Новый проект';
+          } else if (cell.cellType === 'stop' || cell.dayType === 'стоп' || cell.text === 'СТОП') {
+             activeProj = null;
+          }
+        }
+      });
+    });
+    return context;
+  }, [rows, columns]);
+
   const gridItems = React.useMemo(() => {
     const items: GridItem[] = [];
     let currentMonth = '';
@@ -170,11 +191,17 @@ export const DataGrid: React.FC<DataGridProps> = ({
           };
         });
 
-        setColumns(newColumns);
+        // Auto-cleanup: remove completely empty columns
+        const activeColumns = newColumns.filter(c => {
+           if (c.id === 'date') return true;
+           return newRows.some((r: any) => r.data[c.id] && Object.keys(r.data[c.id]).length > 0);
+        });
+
+        setColumns(activeColumns);
         setRows(newRows);
         setError(null);
         if (onDataLoaded) {
-          onDataLoaded(newColumns, newRows);
+          onDataLoaded(activeColumns, newRows);
         }
       } catch (err: any) {
         console.error('Failed to load schedule', err);
@@ -437,20 +464,36 @@ export const DataGrid: React.FC<DataGridProps> = ({
       >
         {/* Header */}
         <div className={styles.headerRow}>
-          {columns.map((col, index) => (
-            <div 
-              key={col.id} 
-              className={styles.headerCell} 
-              onClick={index === 0 ? scrollToToday : () => setIsColumnModalOpen(true)}
-              style={{ 
-                width: col.width,
-                cursor: 'default',
-                ...(index === 0 ? { position: 'sticky', left: 0, zIndex: 21, backgroundColor: 'var(--panel-bg)', borderRight: '1px solid var(--border-color)' } : {})
-              }}
-            >
-              {col.name}
-            </div>
-          ))}
+          {(() => {
+            const virtualItems = rowVirtualizer.getVirtualItems();
+            const topVisibleVirtualItem = virtualItems.length > 0 ? virtualItems[0] : null;
+            const topOriginalIndex = topVisibleVirtualItem && gridItems[topVisibleVirtualItem.index]?.type === 'row' 
+                 ? (gridItems[topVisibleVirtualItem.index] as any).originalIndex 
+                 : 0;
+            
+            return columns.map((col, index) => {
+              const activeProjForHeader = col.id !== 'date' && activeProjectsContext[col.id] ? activeProjectsContext[col.id][topOriginalIndex] : null;
+              return (
+                <div 
+                  key={col.id} 
+                  className={styles.headerCell} 
+                  onClick={index === 0 ? scrollToToday : () => setIsColumnModalOpen(true)}
+                  style={{ 
+                    width: col.width,
+                    cursor: 'default',
+                    ...(index === 0 ? { position: 'sticky', left: 0, zIndex: 21, backgroundColor: 'var(--panel-bg)', borderRight: '1px solid var(--border-color)' } : { position: 'relative' })
+                  }}
+                >
+                  {activeProjForHeader && (
+                     <div style={{ position: 'absolute', inset: 0, backgroundColor: 'var(--primary-color)', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', zIndex: 22, pointerEvents: 'none' }}>
+                        {activeProjForHeader}
+                     </div>
+                  )}
+                  {col.name}
+                </div>
+              );
+            });
+          })()}
         </div>
 
         {error && (
@@ -562,9 +605,15 @@ export const DataGrid: React.FC<DataGridProps> = ({
                       <div className={styles.selectionOverlay} style={{ backgroundColor: mappedColor }}></div>
                     )}
                     <span className={styles.cellText}>
-                      {cellData.staff && cellData.staff.length > 0 ? cellData.staff.join(', ') : cellData.text}
-                      {cellData.cars && cellData.cars.length > 0 && ' 🚗'}
-                      {cellData.dayType && cellData.dayType !== 'выходной' && cellData.dayType !== 'отсыпной' && cellData.dayType !== 'стоп' && ` [${cellData.dayType}]`}
+                      {cellData.cellType === 'project_start' || (!cellData.cellType && cellData.projectName) ? (
+                         <span style={{ fontWeight: 'bold' }}>{cellData.projectName || cellData.text}</span>
+                      ) : (
+                         <>
+                           {cellData.staff && cellData.staff.length > 0 ? cellData.staff.join(', ') : cellData.text}
+                           {cellData.cars && cellData.cars.length > 0 && ' 🚗'}
+                           {cellData.dayType && cellData.dayType !== 'выходной' && cellData.dayType !== 'отсыпной' && cellData.dayType !== 'стоп' && ` [${cellData.dayType}]`}
+                         </>
+                      )}
                     </span>
                   </div>
                 );
@@ -584,33 +633,63 @@ export const DataGrid: React.FC<DataGridProps> = ({
           date={(gridItems[activeCell.rowIndex] as any).row.date}
           columnName={columns[activeCell.colIndex].name}
           initialData={(gridItems[activeCell.rowIndex] as any).row.data[columns[activeCell.colIndex].id] || {}}
+          activeProject={activeProjectsContext[columns[activeCell.colIndex].id]?.[(gridItems[activeCell.rowIndex] as any).originalIndex] || null}
           onSave={async (newData) => {
             const item = gridItems[activeCell.rowIndex];
             if (item.type !== 'row') return;
             const row = item.row;
             const col = columns[activeCell.colIndex];
             
+            const oldCell = row.data[col.id] || ({} as CellData);
+            const isDeletingStart = (oldCell as any).cellType === 'project_start' && newData.cellType !== 'project_start';
+            
             const isoDate = row.rawDate;
             const fullData = { 
               ...row.data, 
-              [col.id]: {
+              [col.id]: Object.keys(newData).length === 0 ? undefined : {
                 ...row.data[col.id],
                 ...newData,
                 text: newData.text || '',
                 color: newData.color || ''
               }
             };
+            if (Object.keys(newData).length === 0) delete fullData[col.id];
 
             try {
-              await apiClient.put('/schedule', {
-                date: isoDate,
-                data: fullData
-              });
+              if (isDeletingStart) {
+                 const updates = [];
+                 updates.push({ date: isoDate, data: fullData });
+                 const newRows = [...rows];
+                 newRows[item.originalIndex] = { ...row, data: fullData };
+                 
+                 for (let i = item.originalIndex + 1; i < rows.length; i++) {
+                    const nextRow = rows[i];
+                    const nextCell = nextRow.data[col.id] as any;
+                    if (nextCell) {
+                       const nextFullData = { ...nextRow.data };
+                       delete nextFullData[col.id];
+                       updates.push({ date: nextRow.rawDate, data: nextFullData });
+                       newRows[i] = { ...nextRow, data: nextFullData };
+                       if (nextCell.cellType === 'stop' || nextCell.dayType === 'стоп' || nextCell.text === 'СТОП') {
+                          break;
+                       }
+                    }
+                 }
+                 
+                 for (const u of updates) {
+                   await apiClient.put('/schedule', u);
+                 }
+                 setRows(newRows);
+              } else {
+                 await apiClient.put('/schedule', {
+                   date: isoDate,
+                   data: fullData
+                 });
+                 const newRows = [...rows];
+                 newRows[item.originalIndex] = { ...row, data: fullData };
+                 setRows(newRows);
+              }
               
-              // Update local state
-              const newRows = [...rows];
-              newRows[item.originalIndex] = { ...row, data: fullData };
-              setRows(newRows);
               setActiveCell(null);
             } catch (err) {
               console.error('Failed to save cell data', err);
