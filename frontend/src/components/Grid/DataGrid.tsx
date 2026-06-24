@@ -105,11 +105,20 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
   const [shouldReload, setShouldReload] = useState(0);
   const [collapsedMonths, setCollapsedMonths] = useState<Record<string, boolean>>({});
+  const [headerHovered, setHeaderHovered] = useState(false);
 
   const todayStrForCalc = React.useMemo(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   }, []);
+
+  const defaultOpenMonth = React.useMemo(() => {
+    if (rows.length === 0) return '';
+    const todayMonth = todayStrForCalc;
+    const hasToday = rows.some(r => r.rawDate.substring(0, 7) === todayMonth);
+    if (hasToday) return todayMonth;
+    return rows[rows.length - 1].rawDate.substring(0, 7);
+  }, [rows, todayStrForCalc]);
 
   const activeProjectsContext = React.useMemo(() => {
     const context: Record<string, ({ name: string, color: string } | null)[]> = {};
@@ -140,15 +149,14 @@ export const DataGrid: React.FC<DataGridProps> = ({
       const monthKey = row.rawDate.substring(0, 7);
       if (monthKey !== currentMonth) {
          currentMonth = monthKey;
-         const isPast = monthKey < todayStrForCalc;
-         const isCollapsed = collapsedMonths[monthKey] !== undefined ? collapsedMonths[monthKey] : isPast;
+         const isCollapsed = collapsedMonths[monthKey] !== undefined ? collapsedMonths[monthKey] : (monthKey !== defaultOpenMonth);
          
          const [y, m] = monthKey.split('-');
          const label = `${MONTH_NAMES[parseInt(m, 10) - 1]} ${y}`;
          items.push({ type: 'month-header', monthKey, label, isCollapsed });
       }
       
-      const isCollapsed = collapsedMonths[monthKey] !== undefined ? collapsedMonths[monthKey] : (monthKey < todayStrForCalc);
+      const isCollapsed = collapsedMonths[monthKey] !== undefined ? collapsedMonths[monthKey] : (monthKey !== defaultOpenMonth);
       if (!isCollapsed) {
          items.push({ type: 'row', row, originalIndex: idx });
       }
@@ -158,8 +166,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
 
   const toggleMonth = (monthKey: string) => {
     setCollapsedMonths(prev => {
-      const isPast = monthKey < todayStrForCalc;
-      const currentlyCollapsed = prev[monthKey] !== undefined ? prev[monthKey] : isPast;
+      const currentlyCollapsed = prev[monthKey] !== undefined ? prev[monthKey] : (monthKey !== defaultOpenMonth);
       return { ...prev, [monthKey]: !currentlyCollapsed };
     });
   };
@@ -447,6 +454,27 @@ export const DataGrid: React.FC<DataGridProps> = ({
     }
   };
 
+  const [hasScrolledInit, setHasScrolledInit] = useState(false);
+  useEffect(() => {
+    if (rows.length > 0 && !hasScrolledInit) {
+      setHasScrolledInit(true);
+      setTimeout(scrollToToday, 200);
+    }
+  }, [rows, hasScrolledInit]);
+
+  const handleDeleteColumn = async (id: string) => {
+    if (window.confirm('Вы уверены, что хотите удалить этот столбец? Это безвозвратно удалит все данные из него за все дни!')) {
+      await apiClient.delete(`/columns/${id}`);
+      setShouldReload(p => p + 1);
+    }
+  };
+
+  const handleAddColumn = async () => {
+    const nextOrder = columns.length;
+    await apiClient.post('/columns', { name: `Колонка ${Date.now()}`, order: nextOrder });
+    setShouldReload(p => p + 1);
+  };
+
   return (
     <div 
       className={styles.gridContainer} 
@@ -463,7 +491,11 @@ export const DataGrid: React.FC<DataGridProps> = ({
         style={{ height: `${rowVirtualizer.getTotalSize() + 40}px`, width: `${totalWidth}px` }}
       >
         {/* Header */}
-        <div className={styles.headerRow}>
+        <div 
+          className={styles.headerRow}
+          onMouseEnter={() => setHeaderHovered(true)}
+          onMouseLeave={() => setHeaderHovered(false)}
+        >
           {(() => {
             const virtualItems = rowVirtualizer.getVirtualItems();
             const topVisibleVirtualItem = virtualItems.length > 0 ? virtualItems[0] : null;
@@ -477,24 +509,74 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 <div 
                   key={col.id} 
                   className={styles.headerCell} 
-                  onClick={index === 0 ? scrollToToday : () => setIsColumnModalOpen(true)}
+                  onClick={index === 0 ? scrollToToday : undefined}
                   style={{ 
                     width: col.width,
-                    cursor: 'default',
+                    cursor: index === 0 ? 'pointer' : 'default',
                     ...(index === 0 ? { position: 'sticky', left: 0, zIndex: 21, backgroundColor: 'var(--panel-bg)', borderRight: '1px solid var(--border-color)' } : { position: 'relative' })
                   }}
                 >
                   {activeProjForHeader && (
-                     <div style={{ position: 'absolute', inset: 0, backgroundColor: 'var(--panel-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 22, pointerEvents: 'none' }}>
-                        <div style={{ position: 'absolute', inset: 0, backgroundColor: activeProjForHeader.color, opacity: 0.15 }}></div>
-                        <span style={{ position: 'relative', fontWeight: 500, color: 'var(--text-primary)' }}>{activeProjForHeader.name}</span>
+                     <div style={{ position: 'absolute', inset: 0, backgroundColor: 'var(--panel-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 22 }}>
+                        <div style={{ position: 'absolute', inset: 0, backgroundColor: activeProjForHeader.color, opacity: 0.15, pointerEvents: 'none' }}></div>
+                        <span style={{ position: 'relative', fontWeight: 500, color: 'var(--text-primary)', pointerEvents: 'none' }}>{activeProjForHeader.name}</span>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleDeleteColumn(col.id); }} 
+                          style={{ position: 'absolute', right: '8px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '14px', opacity: 0.5 }}
+                          title="Удалить столбец"
+                        >✕</button>
                      </div>
                   )}
-                  {index === 0 ? col.name : <span style={{ color: 'var(--text-secondary)' }}>Столбец {index}</span>}
+                  {!activeProjForHeader && index === 0 ? col.name : null}
+                  {!activeProjForHeader && index !== 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '0 8px', position: 'relative' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Столбец {index}</span>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleDeleteColumn(col.id); }} 
+                        style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '14px', opacity: 0.7 }}
+                        title="Удалить столбец"
+                      >✕</button>
+                    </div>
+                  )}
                 </div>
               );
             });
           })()}
+          <div style={{ 
+            position: 'sticky', 
+            right: '24px', 
+            width: 0, 
+            height: '40px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            zIndex: 30, 
+            overflow: 'visible',
+            opacity: headerHovered ? 1 : 0,
+            transition: 'opacity 0.2s ease',
+            pointerEvents: headerHovered ? 'auto' : 'none'
+          }}>
+            <button 
+              onClick={handleAddColumn}
+              style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                backgroundColor: 'var(--primary-color)',
+                color: '#fff',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                transform: 'translateX(50%)'
+              }}
+              title="Добавить столбец"
+            >
+              +
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -556,7 +638,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 const activeProjectForCell = activeProjectsContext[col.id]?.[item.originalIndex];
                 
                 const hasLegacyText = cellData.text && !['Выходной', 'Отсыпной', 'СТОП'].includes(cellData.text.trim()) && cellData.text.trim().length > 0;
-                const isWorkingShift = cellData.staff?.length || cellData.dayType || cellData.cars?.length || hasLegacyText;
+                const isWorkingShift = cellData.cellType === 'shift' || cellData.staff?.length || cellData.dayType || cellData.cars?.length || hasLegacyText;
                 const isWeekend = cellData.text === 'Выходной' || cellData.dayType === 'выходной' || cellData.text === 'Отсыпной' || cellData.dayType === 'отсыпной';
                 const isStop = cellData.text === 'СТОП' || cellData.dayType === 'стоп';
                 const isCellInProject = activeProjectForCell && (isWorkingShift || isWeekend || cellData.cellType === 'shift' || cellData.cellType === 'day_off');
@@ -715,13 +797,6 @@ export const DataGrid: React.FC<DataGridProps> = ({
         />
       )}
 
-      {/* Column Settings Modal */}
-      <ColumnSettingsModal
-        isOpen={isColumnModalOpen}
-        onClose={() => setIsColumnModalOpen(false)}
-        columns={columns.slice(1)}
-        onSave={handleSaveColumns}
-      />
     </div>
   );
 };

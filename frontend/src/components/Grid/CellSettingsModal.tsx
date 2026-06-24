@@ -137,6 +137,11 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
       onSave({}); // empty cell
       return;
     }
+    
+    if (data.cellType === 'shift' && !data.dayType) {
+      alert('Пожалуйста, выберите локацию (натура, павильон и т.д.) для этой смены.');
+      return;
+    }
 
     let text = '';
     let color = data.color || '';
@@ -307,12 +312,10 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
           )}
 
         </div>
-        <div className={styles.footer} style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <button className={styles.cancelBtn} style={{ color: 'var(--danger-color)' }} onClick={handleClear}>Очистить ячейку</button>
-          <div>
-            <button className={styles.cancelBtn} onClick={onClose} style={{ marginRight: '8px' }}>Отмена</button>
-            <button className={styles.saveBtn} style={{ backgroundColor: primaryColor }} onClick={handleSave}>Сохранить</button>
-          </div>
+        <div className={styles.footer} style={{ display: 'flex', flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: '12px' }}>
+          <button className={styles.cancelBtn} style={{ color: 'var(--danger-color)', marginRight: 'auto' }} onClick={handleClear}>Очистить</button>
+          <button className={styles.cancelBtn} onClick={onClose}>Отмена</button>
+          <button className={styles.saveBtn} style={{ backgroundColor: primaryColor }} onClick={handleSave}>Сохранить</button>
         </div>
       </div>
     </div>
