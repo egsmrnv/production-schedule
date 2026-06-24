@@ -1,0 +1,110 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+}
+
+.header {
+  height: var(--header-height);
+  background-color: var(--panel-bg);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+}
+
+.brand {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.logoutBtn {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.logoutBtn:hover {
+  color: var(--text-primary);
+}
+
+.main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: var(--sidebar-width);
+  background-color: var(--panel-bg);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.sidebarSection {
+  margin-bottom: 24px;
+}
+
+.sidebarSection h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin: 0 0 12px 0;
+  font-weight: 600;
+}
+
+.legendList, .staffList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.legendList li {
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.staffList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.copyLinkBtn {
+  font-size: 11px;
+  color: var(--primary-color);
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: var(--bg-color);
+}
+
+.copyLinkBtn:hover {
+  background-color: var(--border-color);
+}
+
+.gridArea {
+  flex: 1;
+  background-color: var(--bg-color);
+  position: relative;
+  overflow: hidden;
+}
+
+.placeholderGrid {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--text-secondary);
+}

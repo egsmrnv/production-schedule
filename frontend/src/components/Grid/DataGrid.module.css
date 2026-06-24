@@ -1,0 +1,96 @@
+.gridContainer {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  outline: none;
+  background-color: var(--grid-bg);
+  position: relative;
+}
+
+.gridInner {
+  position: relative;
+  background-color: var(--grid-border);
+}
+
+.headerRow {
+  display: flex;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background-color: var(--panel-bg-translucent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--grid-border);
+  height: 40px;
+}
+
+.headerCell {
+  padding: 8px 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-right: 1px solid var(--grid-border);
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.row {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  display: flex;
+  border-bottom: 1px solid var(--grid-border);
+}
+
+.cell {
+  background-color: var(--cell-bg);
+  border-right: 1px solid var(--grid-border);
+  padding: 8px;
+  cursor: cell;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cellText {
+  z-index: 1;
+  pointer-events: none;
+}
+
+.dateCell {
+  background-color: var(--panel-bg);
+  font-weight: 500;
+  cursor: default;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  color: var(--text-secondary);
+  border-right: 1px solid var(--border-color);
+}
+
+.cell:hover:not(.dateCell) {
+  background-color: var(--cell-bg-hover);
+}
+
+.selected {
+  background-color: var(--cell-selected) !important;
+  box-shadow: inset 0 0 0 1px var(--cell-selected-border);
+  z-index: 1;
+}
+
+.selectionOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0.3; /* If selected, show underlying color with reduced opacity */
+  z-index: 0;
+}

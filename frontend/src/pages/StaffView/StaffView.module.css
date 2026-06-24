@@ -1,0 +1,103 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--bg-color);
+}
+
+.header {
+  height: var(--header-height);
+  background-color: var(--panel-bg);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.brand {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.staffName {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.content {
+  padding: 16px;
+  flex: 1;
+}
+
+.content h2 {
+  font-size: 18px;
+  margin: 0 0 16px 0;
+}
+
+.dateCard {
+  background-color: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.dateHeader {
+  background-color: #fafafa;
+  padding: 12px 16px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tasks {
+  display: flex;
+  flex-direction: column;
+}
+
+.taskItem {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  gap: 8px;
+}
+
+.taskItem:last-child {
+  border-bottom: none;
+}
+
+.projectName {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.taskCell {
+  font-size: 14px;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+.errorContainer, .loadingContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: var(--text-secondary);
+}
+
+.errorContainer {
+  color: var(--danger-color);
+}
+
+.emptyState {
+  text-align: center;
+  padding: 32px 0;
+  color: var(--text-secondary);
+}

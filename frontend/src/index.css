@@ -1,0 +1,64 @@
+:root {
+  /* Apple Dark Mode Palette */
+  --bg-color: #000000;
+  --panel-bg: #1c1c1e;
+  --panel-bg-translucent: rgba(28, 28, 30, 0.85);
+  --text-primary: #ffffff;
+  --text-secondary: #8e8e93;
+  --border-color: #38383a;
+  
+  --primary-color: #0a84ff;
+  --primary-hover: #007aff;
+  --danger-color: #ff453a;
+  
+  /* Grid specific */
+  --grid-bg: #000000;
+  --grid-border: #38383a;
+  --cell-bg: #1c1c1e;
+  --cell-bg-hover: #2c2c2e;
+  --cell-selected: rgba(10, 132, 255, 0.15);
+  --cell-selected-border: #0a84ff;
+  
+  --header-height: 52px;
+  --sidebar-width: 260px;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  overflow: hidden;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+/* Scrollbar styling for Apple feel */
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border: 4px solid var(--bg-color);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
