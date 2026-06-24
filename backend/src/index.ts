@@ -10,7 +10,6 @@ dotenv.config();
 const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecret';
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:2626';
 
 if (!process.env.JWT_SECRET) {
@@ -359,21 +358,34 @@ app.get('/api/staff/schedule', async (req, res) => {
     // Filter data specifically for this staff member
     // In a real app, we'd only return cells where their name is mentioned
     // Or just return the whole schedule if it's open for them.
-    const filteredDates = dates.map(d => {
+    const filteredDates = [];
+    const staffName = staffUser.name;
+
+    for (const d of dates) {
+      const rowData = d.data as Record<string, any>;
       const filteredData: Record<string, any> = {};
-      const rowData = d.data as Record<string, { text: string, color: string }>;
+      let hasData = false;
       
-      for (const [colId, cell] of Object.entries(rowData)) {
-        // If cell contains staff member's name, include it
-        // Or if we want them to see everything, just pass it through
-        // We'll pass it through for now, but mark it. 
+      for (const colId in rowData) {
+        const cell = rowData[colId];
+        if (!cell) continue;
+
+        // Fast path: if staff array exists, check it directly
         // Real requirement: "сотрудник видит только СВОЕ расписание"
-        if (cell && cell.text && cell.text.includes(staffUser.name)) {
+        if (cell.staff?.includes(staffName)) {
           filteredData[colId] = cell;
+          hasData = true;
+        } else if (cell.text?.includes(staffName)) {
+          // Fallback to text search
+          filteredData[colId] = cell;
+          hasData = true;
         }
       }
-      return { ...d, data: filteredData };
-    }).filter(d => Object.keys(d.data).length > 0);
+
+      if (hasData) {
+        filteredDates.push({ ...d, data: filteredData });
+      }
+    }
 
     res.json({ staffName: staffUser.name, columns, dates: filteredDates });
   } catch (error) {
