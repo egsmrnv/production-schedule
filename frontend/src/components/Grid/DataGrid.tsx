@@ -59,6 +59,11 @@ const DARK_COLOR_MAP: Record<string, string> = {
   '#ffd966': '#7f6000',
   '#e06666': '#660000',
   '#cc0000': '#660000',
+  // Additional legacy colors from imported Google Sheets data
+  '#cccccc': '#2c2c2e', // car grey / generic grey → dark surface
+  '#efefef': '#1c1c1e', // empty placeholder → near-black (treat as empty)
+  '#ffcc00': '#5c4008', // bright yellow → dark amber
+  '#66ccff': '#0a3050', // bright blue → dark navy
 };
 
 const getDarkThemeColor = (color: string): string | undefined =>
@@ -166,13 +171,15 @@ export const DataGrid: React.FC<DataGridProps> = ({
           cell.cellType === 'project_start' ||
           (cell.projectName && !cell.cellType) ||
           (cell.text && !activeProj && !cell.staff?.length && !cell.cars?.length &&
-            cell.text !== 'Выходной' && cell.text !== 'Отсыпной' && cell.text !== 'СТОП');
+            cell.text !== 'Выходной' && cell.text !== 'Отсыпной' && cell.text !== 'СТОП' &&
+            !cell.text.startsWith('Выходной') && !cell.text.startsWith('Отсыпной') &&
+            cell.text !== '— СТОП —');
         if (isProjectStart) {
           activeProj = {
             name: cell.projectName || cell.text || 'Новый проект',
             color: cell.color || 'var(--primary-color)',
           };
-        } else if (cell.cellType === 'stop' || cell.dayType === 'стоп' || cell.text === 'СТОП') {
+        } else if (cell.cellType === 'stop' || cell.dayType === 'стоп' || cell.text === 'СТОП' || cell.text === '— СТОП —') {
           activeProj = null;
         }
       });
@@ -591,10 +598,17 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 const activeProjectForCell = activeProjectsContext[col.id]?.[item.originalIndex] ?? null;
 
                 const isProjectStart = cellData.cellType === 'project_start' || (!cellData.cellType && !!cellData.projectName);
-                const hasLegacyText = !!cellData.text && !['Выходной', 'Отсыпной', 'СТОП'].includes(cellData.text.trim()) && cellData.text.trim().length > 0;
+                const trimmedText = cellData.text?.trim() ?? '';
+                // Legacy "weekend" cells may include notes like "Выходной (ОТМЕНА СМЕНЫ)"
+                const isWeekend = cellData.cellType === 'day_off'
+                  || cellData.dayType === 'выходной' || cellData.dayType === 'отсыпной'
+                  || trimmedText === 'Выходной' || trimmedText === 'Отсыпной'
+                  || trimmedText.startsWith('Выходной') || trimmedText.startsWith('Отсыпной');
+                const isStop = cellData.text === 'СТОП' || cellData.dayType === 'стоп' || trimmedText === '— СТОП —';
+                const hasLegacyText = !!trimmedText
+                  && !isWeekend && !isStop
+                  && trimmedText.length > 0;
                 const isWorkingShift = cellData.cellType === 'shift' || !!cellData.staff?.length || !!cellData.dayType || !!cellData.cars?.length || hasLegacyText;
-                const isWeekend = cellData.text === 'Выходной' || cellData.dayType === 'выходной' || cellData.text === 'Отсыпной' || cellData.dayType === 'отсыпной';
-                const isStop = cellData.text === 'СТОП' || cellData.dayType === 'стоп';
                 const isCellInProject = !!activeProjectForCell && !isProjectStart && (isWorkingShift || isWeekend);
 
                 const mappedColor = resolveCellColor(cellData, isWeekend, isStop, isWorkingShift);
