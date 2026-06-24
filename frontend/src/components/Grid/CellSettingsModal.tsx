@@ -141,6 +141,19 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
     onSave({ ...data, text, color });
   };
 
+  const handleDayTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newDayType = e.target.value;
+    setData(prev => {
+      if (newDayType === 'выходной') {
+        return { ...prev, dayType: newDayType, staff: [], cars: [] };
+      }
+      return { ...prev, dayType: newDayType };
+    });
+  };
+
+  const isWeekend = data.dayType === 'выходной';
+  const disabledStyle = isWeekend ? { opacity: 0.5, pointerEvents: 'none' as const } : {};
+
   return (
     <div className={styles.overlay} onMouseDown={onClose}>
       <div className={styles.modal} onMouseDown={e => e.stopPropagation()}>
@@ -150,7 +163,7 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
         </div>
         <div className={styles.body}>
           
-          <div className={styles.formGroup}>
+          <div className={styles.formGroup} style={disabledStyle}>
             <label>Сотрудники</label>
             <div className={styles.staffList}>
               {data.staff?.map(name => (
@@ -168,7 +181,7 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
             </select>
           </div>
 
-          <div className={styles.formGroup}>
+          <div className={styles.formGroup} style={disabledStyle}>
             <label>Машины</label>
             <div className={styles.checkboxList}>
               {cars.map(car => (
@@ -189,7 +202,7 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
             <select 
               className={styles.select} 
               value={data.dayType || ''}
-              onChange={e => setData(prev => ({ ...prev, dayType: e.target.value }))}
+              onChange={handleDayTypeChange}
             >
               <option value="">(Не выбран)</option>
               {dayTypeOptions.map(dt => (
