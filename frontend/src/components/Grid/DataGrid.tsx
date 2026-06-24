@@ -321,7 +321,10 @@ export const DataGrid: React.FC<DataGridProps> = ({
       ref={parentRef}
       onKeyDown={handleKeyDown}
       tabIndex={0}
-      style={{ '--glow-rgb': hexToRgbString(themeSettings.hoverGlowColor) } as any}
+      style={{ 
+        '--glow-rgb': hexToRgbString(themeSettings.hoverGlowColor),
+        '--current-day-rgb': hexToRgbString(themeSettings.currentDayColor || '#30d158')
+      } as any}
     >
       <div 
         className={styles.gridInner} 
@@ -345,20 +348,23 @@ export const DataGrid: React.FC<DataGridProps> = ({
         {/* Virtualized Rows */}
         {rowVirtualizer.getVirtualItems().map(virtualRow => {
           const row = rows[virtualRow.index];
-          return (
-            <div 
-              key={virtualRow.key}
-              className={styles.row}
-              style={{
-                top: `${virtualRow.start + 40}px`, // +40 for header
-                height: `${virtualRow.size}px`,
-                width: `${totalWidth}px`
-              }}
-            >
-              {/* Date Column (fixed/frozen look) */}
+            return (
               <div 
-                className={`${styles.cell} ${styles.dateCell}`} 
-                style={{ width: columns[0].width }}
+                key={virtualRow.index}
+                className={styles.row}
+                style={{
+                  top: `${virtualRow.start + 40}px`, // +40 for header
+                  height: `${virtualRow.size}px`,
+                  width: `${totalWidth}px`
+                }}
+              >
+                {new Date(row.date).toLocaleDateString('ru-RU') === new Date().toLocaleDateString('ru-RU') && (
+                  <div className={styles.currentDayOverlay} />
+                )}
+                {/* Date Cell (Sticky) */}
+                <div 
+                  className={`${styles.cell} ${styles.dateCell}`}
+                  style={{ width: columns[0].width, zIndex: 10 }}
               >
                 {row.date}
               </div>

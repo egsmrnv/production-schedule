@@ -10,6 +10,7 @@ export interface ThemeSettings {
   transferColor: string;
   stopColor: string;
   hoverGlowColor: string;
+  currentDayColor: string;
 }
 
 export const DEFAULT_THEME: ThemeSettings = {
@@ -20,7 +21,8 @@ export const DEFAULT_THEME: ThemeSettings = {
   warehouseColor: '#3c2b1e',
   transferColor: '#1e3c3c',
   stopColor: '#660000',
-  hoverGlowColor: '#0a84ff'
+  hoverGlowColor: '#0a84ff',
+  currentDayColor: '#30d158'
 };
 
 export const DesignSettingsModal = ({ isOpen, onClose, onSave, initialSettings }: any) => {
@@ -77,6 +79,10 @@ export const DesignSettingsModal = ({ isOpen, onClose, onSave, initialSettings }
           <div className={styles.field}>
             <label>Цвет свечения (Hover)</label>
             <input type="color" value={settings.hoverGlowColor || '#0a84ff'} onChange={e => handleChange('hoverGlowColor', e.target.value)} />
+          </div>
+          <div className={styles.field}>
+            <label>Выделение текущего дня</label>
+            <input type="color" value={settings.currentDayColor || '#30d158'} onChange={e => handleChange('currentDayColor', e.target.value)} />
           </div>
         </div>
         <div className={styles.footer}>
