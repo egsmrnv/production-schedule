@@ -96,6 +96,7 @@ export interface DataGridProps {
   staffList?: string[];
   cars?: any[];
   themeSettings?: ThemeSettings;
+  gridRef?: React.RefObject<{ addColumn: () => void } | null>;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -108,6 +109,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
   staffList = [],
   cars = [],
   themeSettings = DEFAULT_THEME,
+  gridRef,
 }) => {
   const [columns, setColumns] = useState<Column[]>([{ id: 'date', name: 'Дата', width: 100 }]);
   const [rows, setRows] = useState<Row[]>([]);
@@ -115,12 +117,19 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const [activeCell, setActiveCell] = useState<{ rowIndex: number; colIndex: number } | null>(null);
   const [shouldReload, setShouldReload] = useState(0);
   const [collapsedMonths, setCollapsedMonths] = useState<Record<string, boolean>>({});
-  const [headerHovered, setHeaderHovered] = useState(false);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [hasScrolledInit, setHasScrolledInit] = useState(false);
 
   const parentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (gridRef) {
+      (gridRef as any).current = {
+        addColumn: handleAddColumn,
+      };
+    }
+  });
 
   // Stable today strings — computed once on mount
   const todayStr = useMemo(() => formatTodayStr(new Date()), []);
@@ -471,11 +480,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
         style={{ height: `${rowVirtualizer.getTotalSize() + 40}px`, width: `${totalWidth}px` }}
       >
         {/* ── Sticky Header ─────────────────────────────────────────────────── */}
-        <div
-          className={styles.headerRow}
-          onMouseEnter={() => setHeaderHovered(true)}
-          onMouseLeave={() => setHeaderHovered(false)}
-        >
+        <div className={styles.headerRow}>
           {(() => {
             const virtualItems = rowVirtualizer.getVirtualItems();
             // Skip month-header virtual rows — find the first visible *data* row
@@ -534,28 +539,6 @@ export const DataGrid: React.FC<DataGridProps> = ({
               );
             });
           })()}
-
-          {/* Floating "Add column" button — appears on header hover */}
-          <div style={{
-            position: 'sticky', right: '24px', width: 0, height: '40px',
-            display: 'flex', alignItems: 'center', zIndex: 30, overflow: 'visible',
-            opacity: headerHovered ? 1 : 0,
-            transition: 'opacity 0.2s ease',
-            pointerEvents: headerHovered ? 'auto' : 'none',
-          }}>
-            <button
-              onClick={handleAddColumn}
-              style={{
-                width: '28px', height: '28px', borderRadius: '50%',
-                backgroundColor: 'var(--primary-color)', color: '#fff',
-                border: 'none', cursor: 'pointer', fontSize: '20px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                transform: 'translateX(50%)',
-              }}
-              title="Добавить столбец"
-            >+</button>
-          </div>
         </div>
 
         {error && <div style={{ padding: '20px', color: 'var(--danger-color)' }}>{error}</div>}

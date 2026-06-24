@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import styles from './AdminBoard.module.css';
@@ -8,6 +8,7 @@ import { DesignSettingsModal, type ThemeSettings, DEFAULT_THEME } from '../../co
 export const AdminBoard: React.FC = () => {
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
+  const gridRef = useRef<{ addColumn: () => void } | null>(null);
 
   const [staffList, setStaffList] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
@@ -119,6 +120,7 @@ export const AdminBoard: React.FC = () => {
       <div className={styles.main}>
         <section className={styles.gridArea}>
           <DataGrid 
+            gridRef={gridRef}
             onDataLoaded={handleDataLoaded}
             highlightText={highlight.text}
             highlightColor={highlight.color}
@@ -203,12 +205,18 @@ export const AdminBoard: React.FC = () => {
             )}
           </div>
           
-          <div className={styles.sidebarSection} style={{ marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '15px' }}>
+          <div className={styles.sidebarSection} style={{ marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '15px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <button 
               onClick={() => setIsDesignModalOpen(true)}
               style={{ width: '100%', padding: '10px', backgroundColor: 'var(--cell-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', cursor: 'pointer' }}
             >
               🎨 Настройки дизайна
+            </button>
+            <button 
+              onClick={() => gridRef.current?.addColumn()}
+              style={{ width: '100%', padding: '10px', backgroundColor: 'var(--cell-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', cursor: 'pointer' }}
+            >
+              ➕ Добавить столбец
             </button>
           </div>
         </aside>
