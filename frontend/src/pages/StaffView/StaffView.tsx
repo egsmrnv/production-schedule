@@ -3,10 +3,31 @@ import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import styles from './StaffView.module.css';
 
+interface Column {
+  id: string;
+  name: string;
+}
+
+interface CellData {
+  text: string;
+  color?: string;
+}
+
+interface ScheduleDate {
+  date: string;
+  data: Record<string, CellData>;
+}
+
+interface StaffScheduleData {
+  staffName: string;
+  columns: Column[];
+  dates: ScheduleDate[];
+}
+
 export const StaffView: React.FC = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<StaffScheduleData | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -36,12 +57,12 @@ export const StaffView: React.FC = () => {
       </header>
       <div className={styles.content}>
         <h2>Моё расписание</h2>
-        {data.dates.map((d: any) => (
+        {data.dates.map((d: ScheduleDate) => (
           <div key={d.date} className={styles.dateCard}>
             <div className={styles.dateHeader}>{d.date}</div>
             <div className={styles.tasks}>
               {Object.keys(d.data).map(colId => {
-                const column = data.columns.find((c: any) => c.id === colId);
+                const column = data.columns.find((c: Column) => c.id === colId);
                 const cell = d.data[colId];
                 return (
                   <div key={colId} className={styles.taskItem}>
