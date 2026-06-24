@@ -315,6 +315,9 @@ export const DataGrid: React.FC<DataGridProps> = ({
 
   const totalWidth = columns.reduce((acc, col) => acc + col.width, 0);
 
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
   return (
     <div 
       className={styles.gridContainer} 
@@ -344,7 +347,6 @@ export const DataGrid: React.FC<DataGridProps> = ({
             {error}
           </div>
         )}
-
         {/* Virtualized Rows */}
         {rowVirtualizer.getVirtualItems().map(virtualRow => {
           const row = rows[virtualRow.index];
@@ -358,7 +360,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                   width: `${totalWidth}px`
                 }}
               >
-                {new Date(row.date).toLocaleDateString('ru-RU') === new Date().toLocaleDateString('ru-RU') && (
+                {row.rawDate === todayStr && (
                   <div className={styles.currentDayOverlay} />
                 )}
                 {/* Date Cell (Sticky) */}
