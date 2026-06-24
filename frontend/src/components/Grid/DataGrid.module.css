@@ -5,6 +5,8 @@
   outline: none;
   background-color: var(--grid-bg);
   position: relative;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .gridInner {
@@ -91,6 +93,15 @@
   left: 0;
   right: 0;
   bottom: 0;
-  opacity: 0.3; /* If selected, show underlying color with reduced opacity */
+  opacity: 0.3;
   z-index: 0;
+}
+
+.dimmed {
+  opacity: 0.2;
+}
+
+.highlighted {
+  box-shadow: inset 0 0 0 2px var(--primary-color);
+  z-index: 2;
 }

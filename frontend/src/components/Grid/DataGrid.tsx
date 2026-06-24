@@ -26,7 +26,19 @@ interface Selection {
   endCol: number;
 }
 
-export const DataGrid: React.FC = () => {
+export interface DataGridProps {
+  onDataLoaded?: (columns: Column[], rows: Row[]) => void;
+  highlightText?: string;
+  highlightColor?: string;
+  highlightColumnId?: string;
+}
+
+export const DataGrid: React.FC<DataGridProps> = ({ 
+  onDataLoaded, 
+  highlightText, 
+  highlightColor, 
+  highlightColumnId 
+}) => {
   const [columns, setColumns] = useState<Column[]>([
     { id: 'date', name: 'Дата', width: 100 }
   ]);
@@ -63,6 +75,9 @@ export const DataGrid: React.FC = () => {
         setColumns(newColumns);
         setRows(newRows);
         setError(null);
+        if (onDataLoaded) {
+          onDataLoaded(newColumns, newRows);
+        }
       } catch (err: any) {
         console.error('Failed to load schedule', err);
         if (err.response?.status === 401) {
@@ -73,7 +88,7 @@ export const DataGrid: React.FC = () => {
       }
     };
     loadData();
-  }, []);
+  }, [onDataLoaded]);
 
   const parentRef = useRef<HTMLDivElement>(null);
   
@@ -304,10 +319,26 @@ export const DataGrid: React.FC = () => {
                 const cellData = row.data[col.id] || { text: '', color: '' };
                 const selected = isCellSelected(virtualRow.index, actualColIndex);
                 
+                let cellClass = styles.cell;
+                if (selected) cellClass += ` ${styles.selected}`;
+                
+                if (highlightText || highlightColor || highlightColumnId) {
+                  let isMatch = false;
+                  if (highlightColumnId === col.id) {
+                    isMatch = true;
+                  } else {
+                    if (highlightText && cellData.text?.includes(highlightText)) isMatch = true;
+                    if (highlightColor && cellData.color === highlightColor) isMatch = true;
+                  }
+                  
+                  if (isMatch) cellClass += ` ${styles.highlighted}`;
+                  else cellClass += ` ${styles.dimmed}`;
+                }
+
                 return (
                   <div 
                     key={col.id}
-                    className={`${styles.cell} ${selected ? styles.selected : ''}`}
+                    className={cellClass}
                     style={{ 
                       width: col.width,
                       backgroundColor: selected ? undefined : (cellData.color || undefined) 
