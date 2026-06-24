@@ -15,7 +15,7 @@ export const Login: React.FC = () => {
       const res = await apiClient.post('/auth/login', { name, password });
       localStorage.setItem('token', res.data.token);
       navigate('/admin');
-    } catch (err) {
+    } catch {
       setError('Неверное имя пользователя или пароль');
     }
   };

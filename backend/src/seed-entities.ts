@@ -31,8 +31,8 @@ async function run() {
           const cleanWord = w.replace(/[^\p{L}]/gu, '');
           if (
             cleanWord.length > 2 && 
-            cleanWord[0] === cleanWord[0].toUpperCase() && 
-            cleanWord[0] !== cleanWord[0].toLowerCase() && 
+            cleanWord.charAt(0) === cleanWord.charAt(0).toUpperCase() && 
+            cleanWord.charAt(0) !== cleanWord.charAt(0).toLowerCase() && 
             !exclude.includes(cleanWord)
           ) {
             staffSet.add(cleanWord);

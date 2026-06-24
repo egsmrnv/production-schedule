@@ -43,7 +43,7 @@ async function main() {
   });
 
   // Create some initial schedule data
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().substring(0, 10);
   await prisma.scheduleDate.upsert({
     where: { date: today },
     update: {},

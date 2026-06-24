@@ -19,9 +19,13 @@ async function main() {
   const styleText = $('style').text();
   const colorMap: Record<string, string> = {};
   const styleRegex = /\.ritz \.waffle \.(s\d+)\{.*?background-color:(#[0-9a-fA-F]{6});.*?\}/g;
-  let match;
+  let match: RegExpExecArray | null;
   while ((match = styleRegex.exec(styleText)) !== null) {
-    colorMap[match[1]] = match[2];
+    const className = match[1];
+    const colorValue = match[2];
+    if (className && colorValue) {
+      colorMap[className] = colorValue;
+    }
   }
 
   const rows = $('table.waffle tbody tr');

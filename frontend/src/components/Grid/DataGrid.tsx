@@ -234,7 +234,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
       if (jsonStr) {
         pastedJson = JSON.parse(jsonStr);
       }
-    } catch(err) {
+    } catch {
       // Fallback
     }
 
@@ -314,6 +314,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
   }, [handlePaste]);
 
   const totalWidth = columns.reduce((acc, col) => acc + col.width, 0);
+  const dataColumns = columns.slice(1);
 
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -388,7 +389,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 </div>
 
               {/* Data Columns */}
-              {columns.slice(1).map((col, colIndex) => {
+              {dataColumns.map((col, colIndex) => {
                 const actualColIndex = colIndex + 1;
                 const cellData = row.data[col.id] || { text: '', color: '' };
                 const selected = isCellSelected(virtualRow.index, actualColIndex);

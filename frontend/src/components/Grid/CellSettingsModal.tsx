@@ -77,7 +77,7 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
         options: initialData.options || []
       });
     }
-  }, [isOpen, initialData]);
+  }, [isOpen, initialData, cars]);
 
   if (!isOpen) return null;
 

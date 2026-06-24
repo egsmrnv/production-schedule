@@ -111,14 +111,20 @@ app.delete('/api/columns/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     await prisma.projectColumn.delete({ where: { id } });
     
-    // Cascade delete in JSON
+    // Cascade delete in JSON using transaction
     const dates = await prisma.scheduleDate.findMany();
+    const updates = [];
     for (const d of dates) {
       const data = d.data as Record<string, any>;
       if (data[id]) {
         delete data[id];
-        await prisma.scheduleDate.update({ where: { id: d.id }, data: { data } });
+        updates.push(
+          prisma.scheduleDate.update({ where: { id: d.id }, data: { data } })
+        );
       }
+    }
+    if (updates.length > 0) {
+      await prisma.$transaction(updates);
     }
     res.json({ success: true });
   } catch (error) {
@@ -151,7 +157,9 @@ app.delete('/api/admin/staff/:id', requireAdmin, async (req, res) => {
     
     await prisma.user.delete({ where: { id } });
     
+    // Cascade delete in JSON using transaction
     const dates = await prisma.scheduleDate.findMany();
+    const updates = [];
     for (const d of dates) {
       let changed = false;
       const data = d.data as Record<string, any>;
@@ -163,8 +171,13 @@ app.delete('/api/admin/staff/:id', requireAdmin, async (req, res) => {
         }
       }
       if (changed) {
-        await prisma.scheduleDate.update({ where: { id: d.id }, data: { data } });
+        updates.push(
+          prisma.scheduleDate.update({ where: { id: d.id }, data: { data } })
+        );
       }
+    }
+    if (updates.length > 0) {
+      await prisma.$transaction(updates);
     }
     res.json({ success: true });
   } catch (error) {
@@ -196,7 +209,9 @@ app.delete('/api/admin/cars/:id', requireAdmin, async (req, res) => {
     
     await prisma.car.delete({ where: { id } });
     
+    // Cascade delete in JSON using transaction
     const dates = await prisma.scheduleDate.findMany();
+    const updates = [];
     for (const d of dates) {
       let changed = false;
       const data = d.data as Record<string, any>;
@@ -207,8 +222,13 @@ app.delete('/api/admin/cars/:id', requireAdmin, async (req, res) => {
         }
       }
       if (changed) {
-        await prisma.scheduleDate.update({ where: { id: d.id }, data: { data } });
+        updates.push(
+          prisma.scheduleDate.update({ where: { id: d.id }, data: { data } })
+        );
       }
+    }
+    if (updates.length > 0) {
+      await prisma.$transaction(updates);
     }
     res.json({ success: true });
   } catch (error) {
