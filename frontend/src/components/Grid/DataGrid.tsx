@@ -1,10 +1,11 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { apiClient } from '../../api/client';
 import { CellSettingsModal } from './CellSettingsModal';
-import { ColumnSettingsModal } from './ColumnSettingsModal';
 import { type ThemeSettings, DEFAULT_THEME } from './DesignSettingsModal';
 import styles from './DataGrid.module.css';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Column {
   id: string;
@@ -25,6 +26,8 @@ interface CellData {
   cars?: string[];
   dayType?: string;
   options?: string[];
+  cellType?: string;
+  projectName?: string;
 }
 
 interface Selection {
@@ -34,14 +37,56 @@ interface Selection {
   endCol: number;
 }
 
-const MONTH_NAMES = [
-  'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 
-  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
-];
-
-type GridItem = 
+type GridItem =
   | { type: 'month-header'; monthKey: string; label: string; isCollapsed: boolean }
   | { type: 'row'; row: Row; originalIndex: number };
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const MONTH_NAMES = [
+  'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
+];
+
+// ─── Pure helpers (no closure deps, defined once) ─────────────────────────────
+
+/** Maps legacy Google-Sheets colors to dark-theme equivalents. */
+const DARK_COLOR_MAP: Record<string, string> = {
+  '#b6d7a8': '#1e4620',
+  '#fff2cc': '#5c4008',
+  '#f4cccc': '#5c1e1e',
+  '#ffe599': '#7f6000',
+  '#ffd966': '#7f6000',
+  '#e06666': '#660000',
+  '#cc0000': '#660000',
+};
+
+const getDarkThemeColor = (color: string): string | undefined =>
+  DARK_COLOR_MAP[color.toLowerCase()];
+
+const getContrastYIQ = (hexcolor: string | undefined): string | undefined => {
+  if (!hexcolor || hexcolor.startsWith('var(')) return undefined;
+  let c = hexcolor.replace('#', '');
+  if (c.length === 3) c = c.split('').map(ch => ch + ch).join('');
+  if (c.length !== 6) return undefined;
+  const r = parseInt(c.slice(0, 2), 16);
+  const g = parseInt(c.slice(2, 4), 16);
+  const b = parseInt(c.slice(4, 6), 16);
+  return ((r * 299 + g * 587 + b * 114) / 1000 >= 128) ? '#000000' : '#ffffff';
+};
+
+const hexToRgbString = (hex: string): string => {
+  if (!hex) return '10, 132, 255';
+  let c = hex.replace('#', '');
+  if (c.length === 3) c = c.split('').map(x => x + x).join('');
+  if (c.length !== 6) return '10, 132, 255';
+  return `${parseInt(c.slice(0, 2), 16)}, ${parseInt(c.slice(2, 4), 16)}, ${parseInt(c.slice(4, 6), 16)}`;
+};
+
+const formatTodayStr = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+// ─── Props ────────────────────────────────────────────────────────────────────
 
 export interface DataGridProps {
   onDataLoaded?: (columns: Column[], rows: Row[]) => void;
@@ -53,179 +98,109 @@ export interface DataGridProps {
   themeSettings?: ThemeSettings;
 }
 
-const getDarkThemeColor = (color: string) => {
-  const lower = color.toLowerCase();
-  if (lower === '#b6d7a8') return '#1e4620'; // Deep Green
-  if (lower === '#fff2cc') return '#5c4008'; // Deep Yellow
-  if (lower === '#f4cccc') return '#5c1e1e'; // Deep Red
-  if (lower === '#ffe599' || lower === '#ffd966') return '#7f6000'; // Желтый (павильон)
-  if (lower === '#e06666' || lower === '#cc0000') return '#660000'; // Красный (стоп)
-  return undefined;
-};
+// ─── Component ────────────────────────────────────────────────────────────────
 
-const getContrastYIQ = (hexcolor: string) => {
-  if (!hexcolor) return undefined;
-  hexcolor = hexcolor.replace('#', '');
-  if (hexcolor.length === 3) {
-    hexcolor = hexcolor.split('').map(c => c + c).join('');
-  }
-  if (hexcolor.length !== 6) return undefined;
-  const r = parseInt(hexcolor.substr(0,2),16);
-  const g = parseInt(hexcolor.substr(2,2),16);
-  const b = parseInt(hexcolor.substr(4,2),16);
-  const yiq = ((r*299)+(g*587)+(b*114))/1000;
-  return (yiq >= 128) ? '#000000' : '#ffffff';
-};
-
-const hexToRgbString = (hex: string) => {
-  if (!hex) return '10, 132, 255';
-  let c = hex.replace('#', '');
-  if (c.length === 3) c = c.split('').map(x => x + x).join('');
-  if (c.length !== 6) return '10, 132, 255';
-  return `${parseInt(c.substr(0,2),16)}, ${parseInt(c.substr(2,2),16)}, ${parseInt(c.substr(4,2),16)}`;
-};
-
-export const DataGrid: React.FC<DataGridProps> = ({  
-  onDataLoaded, 
-  highlightText, 
-  highlightColor, 
+export const DataGrid: React.FC<DataGridProps> = ({
+  onDataLoaded,
+  highlightText,
+  highlightColor,
   highlightColumnId,
   staffList = [],
   cars = [],
-  themeSettings = DEFAULT_THEME
+  themeSettings = DEFAULT_THEME,
 }) => {
-  const [columns, setColumns] = useState<Column[]>([
-    { id: 'date', name: 'Дата', width: 100 }
-  ]);
-
+  const [columns, setColumns] = useState<Column[]>([{ id: 'date', name: 'Дата', width: 100 }]);
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState<string | null>(null);
-
-  const [activeCell, setActiveCell] = useState<{rowIndex: number, colIndex: number} | null>(null);
-  const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
+  const [activeCell, setActiveCell] = useState<{ rowIndex: number; colIndex: number } | null>(null);
   const [shouldReload, setShouldReload] = useState(0);
   const [collapsedMonths, setCollapsedMonths] = useState<Record<string, boolean>>({});
   const [headerHovered, setHeaderHovered] = useState(false);
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [hasScrolledInit, setHasScrolledInit] = useState(false);
 
-  const todayStrForCalc = React.useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  }, []);
+  const parentRef = useRef<HTMLDivElement>(null);
 
-  const defaultOpenMonth = React.useMemo(() => {
+  // Stable today strings — computed once on mount
+  const todayStr = useMemo(() => formatTodayStr(new Date()), []);
+  const todayMonthKey = useMemo(() => todayStr.slice(0, 7), [todayStr]);
+
+  // The one month that should start open (current month, or last available)
+  const defaultOpenMonth = useMemo(() => {
     if (rows.length === 0) return '';
-    const todayMonth = todayStrForCalc;
-    const hasToday = rows.some(r => r.rawDate.substring(0, 7) === todayMonth);
-    if (hasToday) return todayMonth;
-    return rows[rows.length - 1].rawDate.substring(0, 7);
-  }, [rows, todayStrForCalc]);
+    const hasCurrentMonth = rows.some(r => r.rawDate.startsWith(todayMonthKey));
+    return hasCurrentMonth ? todayMonthKey : rows[rows.length - 1].rawDate.slice(0, 7);
+  }, [rows, todayMonthKey]);
 
-  const activeProjectsContext = React.useMemo(() => {
-    const context: Record<string, ({ name: string, color: string } | null)[]> = {};
-    columns.forEach(c => {
-      if (c.id === 'date') return;
-      context[c.id] = new Array(rows.length).fill(null);
-      let activeProj: { name: string, color: string } | null = null;
+  // Helper: resolve whether a given month is collapsed
+  const isMonthCollapsed = useCallback(
+    (monthKey: string) =>
+      collapsedMonths[monthKey] !== undefined
+        ? collapsedMonths[monthKey]
+        : monthKey !== defaultOpenMonth,
+    [collapsedMonths, defaultOpenMonth],
+  );
+
+  // Per-column active-project tracking (O(columns × rows))
+  const activeProjectsContext = useMemo(() => {
+    const ctx: Record<string, ({ name: string; color: string } | null)[]> = {};
+    for (const col of columns) {
+      if (col.id === 'date') continue;
+      const colCtx: ({ name: string; color: string } | null)[] = new Array(rows.length).fill(null);
+      let activeProj: { name: string; color: string } | null = null;
       rows.forEach((row, i) => {
-        context[c.id][i] = activeProj;
-        const cell = row.data[c.id];
-        if (cell) {
-          if (cell.cellType === 'project_start' || (cell.projectName && !cell.cellType) || (cell.text && !activeProj && !cell.staff?.length && !cell.cars?.length && cell.text !== 'Выходной' && cell.text !== 'Отсыпной' && cell.text !== 'СТОП')) {
-             activeProj = { name: cell.projectName || cell.text || 'Новый проект', color: cell.color || 'var(--primary-color)' };
-          } else if (cell.cellType === 'stop' || cell.dayType === 'стоп' || cell.text === 'СТОП') {
-             activeProj = null;
-          }
+        colCtx[i] = activeProj;
+        const cell = row.data[col.id] as CellData | undefined;
+        if (!cell) return;
+        const isProjectStart =
+          cell.cellType === 'project_start' ||
+          (cell.projectName && !cell.cellType) ||
+          (cell.text && !activeProj && !cell.staff?.length && !cell.cars?.length &&
+            cell.text !== 'Выходной' && cell.text !== 'Отсыпной' && cell.text !== 'СТОП');
+        if (isProjectStart) {
+          activeProj = {
+            name: cell.projectName || cell.text || 'Новый проект',
+            color: cell.color || 'var(--primary-color)',
+          };
+        } else if (cell.cellType === 'stop' || cell.dayType === 'стоп' || cell.text === 'СТОП') {
+          activeProj = null;
         }
       });
-    });
-    return context;
+      ctx[col.id] = colCtx;
+    }
+    return ctx;
   }, [rows, columns]);
 
-  const gridItems = React.useMemo(() => {
+  // Flat list of virtualizable items (month headers + rows)
+  const gridItems = useMemo<GridItem[]>(() => {
     const items: GridItem[] = [];
     let currentMonth = '';
-
     rows.forEach((row, idx) => {
-      const monthKey = row.rawDate.substring(0, 7);
+      const monthKey = row.rawDate.slice(0, 7);
       if (monthKey !== currentMonth) {
-         currentMonth = monthKey;
-         const isCollapsed = collapsedMonths[monthKey] !== undefined ? collapsedMonths[monthKey] : (monthKey !== defaultOpenMonth);
-         
-         const [y, m] = monthKey.split('-');
-         const label = `${MONTH_NAMES[parseInt(m, 10) - 1]} ${y}`;
-         items.push({ type: 'month-header', monthKey, label, isCollapsed });
+        currentMonth = monthKey;
+        const collapsed = isMonthCollapsed(monthKey);
+        const [y, m] = monthKey.split('-');
+        items.push({
+          type: 'month-header',
+          monthKey,
+          label: `${MONTH_NAMES[parseInt(m, 10) - 1]} ${y}`,
+          isCollapsed: collapsed,
+        });
       }
-      
-      const isCollapsed = collapsedMonths[monthKey] !== undefined ? collapsedMonths[monthKey] : (monthKey !== defaultOpenMonth);
-      if (!isCollapsed) {
-         items.push({ type: 'row', row, originalIndex: idx });
+      if (!isMonthCollapsed(monthKey)) {
+        items.push({ type: 'row', row, originalIndex: idx });
       }
     });
     return items;
-  }, [rows, collapsedMonths, todayStrForCalc]);
+  }, [rows, isMonthCollapsed]);
 
-  const toggleMonth = (monthKey: string) => {
-    setCollapsedMonths(prev => {
-      const currentlyCollapsed = prev[monthKey] !== undefined ? prev[monthKey] : (monthKey !== defaultOpenMonth);
-      return { ...prev, [monthKey]: !currentlyCollapsed };
-    });
-  };
+  // Keep a ref so scrollToToday closure always sees latest items
+  const gridItemsRef = useRef(gridItems);
+  useEffect(() => { gridItemsRef.current = gridItems; }, [gridItems]);
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const res = await apiClient.get('/schedule');
-        const dbColumns = res.data.columns || [];
-        const dbDates = res.data.dates || [];
-
-        const newColumns = [
-          { id: 'date', name: 'Дата', width: 60 },
-          ...dbColumns.map((c: any) => ({
-            id: c.id,
-            name: c.name,
-            width: 280
-          }))
-        ];
-
-        // Format date from YYYY-MM-DD to DD.MM
-        const newRows = dbDates.map((d: any) => {
-          const parts = d.date.split('-');
-          const displayDate = parts.length === 3 ? `${parts[2]}.${parts[1]}` : d.date;
-          return {
-            date: displayDate,
-            rawDate: d.date,
-            data: d.data
-          };
-        });
-
-        // Auto-cleanup: remove completely empty columns
-        const activeColumns = newColumns.filter(c => {
-           if (c.id === 'date') return true;
-           return newRows.some((r: any) => r.data[c.id] && Object.keys(r.data[c.id]).length > 0);
-        });
-
-        setColumns(activeColumns);
-        setRows(newRows);
-        setError(null);
-        if (onDataLoaded) {
-          onDataLoaded(activeColumns, newRows);
-        }
-      } catch (err: any) {
-        console.error('Failed to load schedule', err);
-        if (err.response?.status === 401) {
-          setError('Необходима авторизация. Пожалуйста, войдите в систему.');
-        } else {
-          setError('Не удалось загрузить данные. Проверьте, запущен ли бэкенд.');
-        }
-      }
-    };
-    loadData();
-  }, [onDataLoaded, shouldReload]);
-
-  const parentRef = useRef<HTMLDivElement>(null);
-  
-  const [selection, setSelection] = useState<Selection | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  // ─── Virtualizer ─────────────────────────────────────────────────────────────
 
   const rowVirtualizer = useVirtualizer({
     count: gridItems.length,
@@ -234,169 +209,225 @@ export const DataGrid: React.FC<DataGridProps> = ({
     overscan: 10,
   });
 
+  // ─── Derived layout values ────────────────────────────────────────────────────
+
+  const totalWidth = useMemo(() => columns.reduce((acc, col) => acc + col.width, 0), [columns]);
+  const dataColumns = useMemo(() => columns.slice(1), [columns]);
+
+  // ─── Normalised selection bounds (avoids recalculation in isCellSelected) ─────
+
+  const selectionBounds = useMemo(() => {
+    if (!selection) return null;
+    return {
+      minRow: Math.min(selection.startRow, selection.endRow),
+      maxRow: Math.max(selection.startRow, selection.endRow),
+      minCol: Math.min(selection.startCol, selection.endCol),
+      maxCol: Math.max(selection.startCol, selection.endCol),
+    };
+  }, [selection]);
+
+  const isCellSelected = (rowIdx: number, colIdx: number): boolean => {
+    if (!selectionBounds) return false;
+    const { minRow, maxRow, minCol, maxCol } = selectionBounds;
+    return rowIdx >= minRow && rowIdx <= maxRow && colIdx >= minCol && colIdx <= maxCol;
+  };
+
+  // ─── Data loading ─────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const res = await apiClient.get('/schedule');
+        const dbColumns: any[] = res.data.columns || [];
+        const dbDates: any[] = res.data.dates || [];
+
+        const newColumns: Column[] = [
+          { id: 'date', name: 'Дата', width: 60 },
+          ...dbColumns.map(c => ({ id: c.id, name: c.name, width: 280 })),
+        ];
+
+        const newRows: Row[] = dbDates.map((d: any) => {
+          const [, , day] = d.date.split('-');
+          const [, month] = d.date.split('-');
+          return {
+            date: `${day}.${month}`,
+            rawDate: d.date,
+            data: d.data,
+          };
+        });
+
+        // Drop columns that have zero data across all rows
+        const activeColumns = newColumns.filter(
+          c => c.id === 'date' || newRows.some(r => r.data[c.id] && Object.keys(r.data[c.id]).length > 0),
+        );
+
+        setColumns(activeColumns);
+        setRows(newRows);
+        setError(null);
+        onDataLoaded?.(activeColumns, newRows);
+      } catch (err: any) {
+        console.error('Failed to load schedule', err);
+        setError(
+          err.response?.status === 401
+            ? 'Необходима авторизация. Пожалуйста, войдите в систему.'
+            : 'Не удалось загрузить данные. Проверьте, запущен ли бэкенд.',
+        );
+      }
+    };
+    loadData();
+  }, [onDataLoaded, shouldReload]);
+
+  // ─── Scroll to today (on init + on date-cell click) ──────────────────────────
+
+  const scrollToToday = useCallback(() => {
+    const performScroll = () => {
+      const idx = gridItemsRef.current.findIndex(
+        item => item.type === 'row' && item.row.rawDate === todayStr,
+      );
+      if (idx !== -1) rowVirtualizer.scrollToIndex(idx, { align: 'center' });
+    };
+
+    if (isMonthCollapsed(todayMonthKey)) {
+      setCollapsedMonths(prev => ({ ...prev, [todayMonthKey]: false }));
+      setTimeout(performScroll, 50);
+    } else {
+      performScroll();
+    }
+  }, [todayStr, todayMonthKey, isMonthCollapsed, rowVirtualizer]);
+
+  useEffect(() => {
+    if (rows.length > 0 && !hasScrolledInit) {
+      setHasScrolledInit(true);
+      setTimeout(scrollToToday, 200);
+    }
+  }, [rows, hasScrolledInit, scrollToToday]);
+
+  // ─── Month toggle ─────────────────────────────────────────────────────────────
+
+  const toggleMonth = (monthKey: string) => {
+    setCollapsedMonths(prev => ({ ...prev, [monthKey]: !isMonthCollapsed(monthKey) }));
+  };
+
+  // ─── Column management ────────────────────────────────────────────────────────
+
+  const handleDeleteColumn = async (id: string) => {
+    if (!window.confirm('Вы уверены, что хотите удалить этот столбец? Это безвозвратно удалит все данные из него за все дни!')) return;
+    await apiClient.delete(`/columns/${id}`);
+    setShouldReload(p => p + 1);
+  };
+
+  const handleAddColumn = async () => {
+    await apiClient.post('/columns', { name: `Колонка ${Date.now()}`, order: columns.length });
+    setShouldReload(p => p + 1);
+  };
+
+  // ─── Mouse selection ──────────────────────────────────────────────────────────
+
   const handleMouseDown = (rowIdx: number, colIdx: number) => {
-    // Only allow selecting data columns, not the date column (index 0)
     if (colIdx === 0) return;
-    setSelection({
-      startRow: rowIdx,
-      startCol: colIdx,
-      endRow: rowIdx,
-      endCol: colIdx,
-    });
+    setSelection({ startRow: rowIdx, startCol: colIdx, endRow: rowIdx, endCol: colIdx });
     setIsDragging(true);
   };
 
   const handleMouseEnter = (rowIdx: number, colIdx: number) => {
-    if (isDragging && selection && colIdx !== 0) {
-      setSelection({
-        ...selection,
-        endRow: rowIdx,
-        endCol: colIdx,
-      });
-    }
+    if (!isDragging || !selection || colIdx === 0) return;
+    setSelection({ ...selection, endRow: rowIdx, endCol: colIdx });
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
+  const handleMouseUp = () => setIsDragging(false);
 
   useEffect(() => {
     window.addEventListener('mouseup', handleMouseUp);
     return () => window.removeEventListener('mouseup', handleMouseUp);
   }, []);
 
-  const isCellSelected = (rowIdx: number, colIdx: number) => {
-    if (!selection) return false;
-    const minRow = Math.min(selection.startRow, selection.endRow);
-    const maxRow = Math.max(selection.startRow, selection.endRow);
-    const minCol = Math.min(selection.startCol, selection.endCol);
-    const maxCol = Math.max(selection.startCol, selection.endCol);
-    return rowIdx >= minRow && rowIdx <= maxRow && colIdx >= minCol && colIdx <= maxCol;
-  };
+  // ─── Keyboard: copy ───────────────────────────────────────────────────────────
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (!selection) return;
-
-    if (e.key === 'c' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      // Copy
-      const minRow = Math.min(selection.startRow, selection.endRow);
-      const maxRow = Math.max(selection.startRow, selection.endRow);
-      const minCol = Math.min(selection.startCol, selection.endCol);
-      const maxCol = Math.max(selection.startCol, selection.endCol);
-
-      const clipboardData: any[][] = [];
-      let plainText = '';
-
-      for (let r = minRow; r <= maxRow; r++) {
-        const item = gridItems[r];
-        if (item.type === 'month-header') continue;
-        const originalIndex = item.originalIndex;
-        const rowData = [];
-        for (let c = minCol; c <= maxCol; c++) {
-          const colId = columns[c].id;
-          const cell = rows[originalIndex].data[colId] || { text: '', color: '' };
-          rowData.push(cell);
-          plainText += cell.text + (c < maxCol ? '\t' : '');
-        }
-        clipboardData.push(rowData);
-        plainText += '\n';
+    if (!selection || !(e.key === 'c' && (e.metaKey || e.ctrlKey))) return;
+    e.preventDefault();
+    const { minRow, maxRow, minCol, maxCol } = selectionBounds!;
+    const clipboardData: any[][] = [];
+    let plainText = '';
+    for (let r = minRow; r <= maxRow; r++) {
+      const item = gridItems[r];
+      if (item.type === 'month-header') continue;
+      const rowData: any[] = [];
+      for (let c = minCol; c <= maxCol; c++) {
+        const cell = rows[item.originalIndex].data[columns[c].id] || { text: '', color: '' };
+        rowData.push(cell);
+        plainText += cell.text + (c < maxCol ? '\t' : '');
       }
-
-      navigator.clipboard.write([
-        new ClipboardItem({
-          'text/plain': new Blob([plainText.trim()], { type: 'text/plain' }),
-          'application/json': new Blob([JSON.stringify(clipboardData)], { type: 'application/json' })
-        })
-      ]);
+      clipboardData.push(rowData);
+      plainText += '\n';
     }
-  }, [selection, rows, columns]);
+    navigator.clipboard.write([
+      new ClipboardItem({
+        'text/plain': new Blob([plainText.trim()], { type: 'text/plain' }),
+        'application/json': new Blob([JSON.stringify(clipboardData)], { type: 'application/json' }),
+      }),
+    ]);
+  }, [selection, selectionBounds, rows, columns, gridItems]);
+
+  // ─── Paste ────────────────────────────────────────────────────────────────────
 
   const handlePaste = useCallback(async (e: ClipboardEvent) => {
     if (!selection) return;
-    
-    let pastedJson;
-    try {
-      const jsonStr = e.clipboardData?.getData('application/json');
-      if (jsonStr) {
-        pastedJson = JSON.parse(jsonStr);
-      }
-    } catch {
-      // Fallback
-    }
-
     const minRow = Math.min(selection.startRow, selection.endRow);
     const minCol = Math.min(selection.startCol, selection.endCol);
-
     const newRows = [...rows];
 
+    let pastedJson: any[][] | null = null;
+    try {
+      const jsonStr = e.clipboardData?.getData('application/json');
+      if (jsonStr) pastedJson = JSON.parse(jsonStr);
+    } catch { /* fallback to plain text */ }
+
     if (pastedJson && Array.isArray(pastedJson)) {
-      let pastedRowIdx = 0;
-      for (let r = minRow; r < gridItems.length && pastedRowIdx < pastedJson.length; r++) {
+      let pasteRowIdx = 0;
+      for (let r = minRow; r < gridItems.length && pasteRowIdx < pastedJson.length; r++) {
         const item = gridItems[r];
         if (item.type === 'month-header') continue;
-        const targetRow = item.originalIndex;
-
-        for (let c = 0; c < pastedJson[pastedRowIdx].length; c++) {
+        for (let c = 0; c < pastedJson[pasteRowIdx].length; c++) {
           const targetCol = minCol + c;
           if (targetCol >= columns.length) break;
-
           const colId = columns[targetCol].id;
-          newRows[targetRow] = {
-            ...newRows[targetRow],
+          newRows[item.originalIndex] = {
+            ...newRows[item.originalIndex],
             data: {
-              ...newRows[targetRow].data,
-              [colId]: {
-                text: pastedJson[pastedRowIdx][c].text || '',
-                color: pastedJson[pastedRowIdx][c].color || ''
-              }
-            }
+              ...newRows[item.originalIndex].data,
+              [colId]: { text: pastedJson[pasteRowIdx][c].text || '', color: pastedJson[pasteRowIdx][c].color || '' },
+            },
           };
         }
-        pastedRowIdx++;
+        pasteRowIdx++;
       }
       setRows(newRows);
-      
-      // Select the newly pasted area
       setSelection({
-        startRow: minRow,
-        startCol: minCol,
+        startRow: minRow, startCol: minCol,
         endRow: Math.min(minRow + pastedJson.length - 1, gridItems.length - 1),
-        endCol: Math.min(minCol + pastedJson[0].length - 1, columns.length - 1)
+        endCol: Math.min(minCol + pastedJson[0].length - 1, columns.length - 1),
       });
     } else {
-      // Plain text paste fallback
       const text = e.clipboardData?.getData('text/plain');
       if (!text) return;
-      
-      const textRows = text.split('\n');
-      let pastedRowIdx = 0;
-      for (let r = minRow; r < gridItems.length && pastedRowIdx < textRows.length; r++) {
+      let pasteRowIdx = 0;
+      for (const line of text.split('\n')) {
+        let r = minRow + pasteRowIdx;
+        if (r >= gridItems.length) break;
         const item = gridItems[r];
-        if (item.type === 'month-header') continue;
-        const targetRow = item.originalIndex;
-
-        const cells = textRows[pastedRowIdx].split('\t');
-        pastedRowIdx++;
-        
-        for (let c = 0; c < cells.length; c++) {
+        if (item.type === 'month-header') { pasteRowIdx++; continue; }
+        line.split('\t').forEach((cell, c) => {
           const targetCol = minCol + c;
-          if (targetCol >= columns.length) break;
-
+          if (targetCol >= columns.length) return;
           const colId = columns[targetCol].id;
-          // Keep existing color, just change text
-          const existingColor = newRows[targetRow].data[colId]?.color || '';
-          newRows[targetRow] = {
-            ...newRows[targetRow],
-            data: {
-              ...newRows[targetRow].data,
-              [colId]: {
-                text: cells[c] || '',
-                color: existingColor
-              }
-            }
+          const existingColor = newRows[item.originalIndex].data[colId]?.color || '';
+          newRows[item.originalIndex] = {
+            ...newRows[item.originalIndex],
+            data: { ...newRows[item.originalIndex].data, [colId]: { text: cell, color: existingColor } },
           };
-        }
+        });
+        pasteRowIdx++;
       }
       setRows(newRows);
     }
@@ -407,132 +438,86 @@ export const DataGrid: React.FC<DataGridProps> = ({
     return () => document.removeEventListener('paste', handlePaste);
   }, [handlePaste]);
 
-  const totalWidth = columns.reduce((acc, col) => acc + col.width, 0);
-  const dataColumns = columns.slice(1);
+  // ─── Cell color resolver ──────────────────────────────────────────────────────
 
-  const handleSaveColumns = async (newCols: Column[], deletedIds: string[], addedCols: {name: string, order: number}[]) => {
-    for (const id of deletedIds) {
-      await apiClient.delete(`/columns/${id}`);
+  const resolveCellColor = (cellData: CellData, isWeekend: boolean, isStop: boolean, isWorkingShift: boolean): string | undefined => {
+    if (cellData.cellType === 'project_start' || (!cellData.cellType && cellData.projectName)) {
+      return cellData.color ? (getDarkThemeColor(cellData.color) ?? cellData.color) : 'var(--primary-color)';
     }
-    const idMap: Record<string, string> = {};
-    for (const c of addedCols) {
-      const res = await apiClient.post('/columns', { name: c.name, order: c.order });
-      idMap[c.name] = res.data.id;
-    }
-    const updates = newCols.map((c, i) => ({
-      id: c.id.startsWith('new-') ? idMap[c.name] : c.id,
-      order: i
-    }));
-    await apiClient.put('/columns/reorder', updates);
-    setShouldReload(prev => prev + 1);
+    if (isWeekend) return themeSettings.weekendColor;
+    if (isStop) return themeSettings.stopColor;
+    if (cellData.dayType === 'павильон') return themeSettings.pavilionColor;
+    if (cellData.dayType === 'склад') return themeSettings.warehouseColor;
+    if (cellData.dayType === 'переезд') return themeSettings.transferColor;
+    if (isWorkingShift) return cellData.color ? (getDarkThemeColor(cellData.color) ?? cellData.color) : themeSettings.shiftColor;
+    return undefined;
   };
 
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-
-  const gridItemsRef = useRef(gridItems);
-  useEffect(() => {
-    gridItemsRef.current = gridItems;
-  }, [gridItems]);
-
-  const scrollToToday = () => {
-    const todayMonthKey = todayStr.substring(0, 7);
-    
-    const performScroll = () => {
-      const latestItems = gridItemsRef.current;
-      const todayIndex = latestItems.findIndex(item => item.type === 'row' && item.row.rawDate === todayStr);
-      if (todayIndex !== -1) {
-        rowVirtualizer.scrollToIndex(todayIndex, { align: 'center' });
-      }
-    };
-
-    if (collapsedMonths[todayMonthKey]) {
-      setCollapsedMonths(prev => ({ ...prev, [todayMonthKey]: false }));
-      setTimeout(performScroll, 50);
-    } else {
-      performScroll();
-    }
-  };
-
-  const [hasScrolledInit, setHasScrolledInit] = useState(false);
-  useEffect(() => {
-    if (rows.length > 0 && !hasScrolledInit) {
-      setHasScrolledInit(true);
-      setTimeout(scrollToToday, 200);
-    }
-  }, [rows, hasScrolledInit]);
-
-  const handleDeleteColumn = async (id: string) => {
-    if (window.confirm('Вы уверены, что хотите удалить этот столбец? Это безвозвратно удалит все данные из него за все дни!')) {
-      await apiClient.delete(`/columns/${id}`);
-      setShouldReload(p => p + 1);
-    }
-  };
-
-  const handleAddColumn = async () => {
-    const nextOrder = columns.length;
-    await apiClient.post('/columns', { name: `Колонка ${Date.now()}`, order: nextOrder });
-    setShouldReload(p => p + 1);
-  };
+  // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
-    <div 
-      className={styles.gridContainer} 
+    <div
+      className={styles.gridContainer}
       ref={parentRef}
       onKeyDown={handleKeyDown}
       tabIndex={0}
-      style={{ 
+      style={{
         '--glow-rgb': hexToRgbString(themeSettings.hoverGlowColor),
-        '--current-day-rgb': hexToRgbString(themeSettings.currentDayColor || '#30d158')
+        '--current-day-rgb': hexToRgbString(themeSettings.currentDayColor || '#30d158'),
       } as any}
     >
-      <div 
-        className={styles.gridInner} 
+      <div
+        className={styles.gridInner}
         style={{ height: `${rowVirtualizer.getTotalSize() + 40}px`, width: `${totalWidth}px` }}
       >
-        {/* Header */}
-        <div 
+        {/* ── Sticky Header ─────────────────────────────────────────────────── */}
+        <div
           className={styles.headerRow}
           onMouseEnter={() => setHeaderHovered(true)}
           onMouseLeave={() => setHeaderHovered(false)}
         >
           {(() => {
             const virtualItems = rowVirtualizer.getVirtualItems();
-            const topVisibleVirtualItem = virtualItems.length > 0 ? virtualItems[0] : null;
-            const topOriginalIndex = topVisibleVirtualItem && gridItems[topVisibleVirtualItem.index]?.type === 'row' 
-                 ? (gridItems[topVisibleVirtualItem.index] as any).originalIndex 
-                 : 0;
-            
+            const topItem = virtualItems[0] ? gridItems[virtualItems[0].index] : null;
+            const topOriginalIndex = topItem?.type === 'row' ? topItem.originalIndex : 0;
+
             return columns.map((col, index) => {
-              const activeProjForHeader = col.id !== 'date' && activeProjectsContext[col.id] ? activeProjectsContext[col.id][topOriginalIndex] : null;
+              const activeProjForHeader =
+                col.id !== 'date' ? activeProjectsContext[col.id]?.[topOriginalIndex] ?? null : null;
+
               return (
-                <div 
-                  key={col.id} 
-                  className={styles.headerCell} 
+                <div
+                  key={col.id}
+                  className={styles.headerCell}
                   onClick={index === 0 ? scrollToToday : undefined}
-                  style={{ 
+                  style={{
                     width: col.width,
                     cursor: index === 0 ? 'pointer' : 'default',
-                    ...(index === 0 ? { position: 'sticky', left: 0, zIndex: 21, backgroundColor: 'var(--panel-bg)', borderRight: '1px solid var(--border-color)' } : { position: 'relative' })
+                    position: index === 0 ? 'sticky' : 'relative',
+                    left: index === 0 ? 0 : undefined,
+                    zIndex: index === 0 ? 21 : undefined,
+                    backgroundColor: index === 0 ? 'var(--panel-bg)' : undefined,
+                    borderRight: index === 0 ? '1px solid var(--border-color)' : undefined,
                   }}
                 >
-                  {activeProjForHeader && (
-                     <div style={{ position: 'absolute', inset: 0, backgroundColor: 'var(--panel-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 22 }}>
-                        <div style={{ position: 'absolute', inset: 0, backgroundColor: activeProjForHeader.color, opacity: 0.15, pointerEvents: 'none' }}></div>
-                        <span style={{ position: 'relative', fontWeight: 500, color: 'var(--text-primary)', pointerEvents: 'none' }}>{activeProjForHeader.name}</span>
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); handleDeleteColumn(col.id); }} 
-                          style={{ position: 'absolute', right: '8px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '14px', opacity: 0.5 }}
-                          title="Удалить столбец"
-                        >✕</button>
-                     </div>
-                  )}
-                  {!activeProjForHeader && index === 0 ? col.name : null}
-                  {!activeProjForHeader && index !== 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '0 8px', position: 'relative' }}>
+                  {activeProjForHeader ? (
+                    // Project overlay covers the entire header cell
+                    <div style={{ position: 'absolute', inset: 0, backgroundColor: 'var(--panel-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 22 }}>
+                      <div style={{ position: 'absolute', inset: 0, backgroundColor: activeProjForHeader.color, opacity: 0.15, pointerEvents: 'none' }} />
+                      <span style={{ position: 'relative', fontWeight: 500, color: 'var(--text-primary)', pointerEvents: 'none' }}>{activeProjForHeader.name}</span>
+                      <button
+                        onClick={e => { e.stopPropagation(); handleDeleteColumn(col.id); }}
+                        style={{ position: 'absolute', right: '8px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '14px', opacity: 0.5 }}
+                        title="Удалить столбец"
+                      >✕</button>
+                    </div>
+                  ) : index === 0 ? (
+                    col.name
+                  ) : (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '0 8px' }}>
                       <span style={{ color: 'var(--text-secondary)' }}>Столбец {index}</span>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleDeleteColumn(col.id); }} 
+                      <button
+                        onClick={e => { e.stopPropagation(); handleDeleteColumn(col.id); }}
                         style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '14px', opacity: 0.7 }}
                         title="Удалить столбец"
                       >✕</button>
@@ -542,62 +527,47 @@ export const DataGrid: React.FC<DataGridProps> = ({
               );
             });
           })()}
-          <div style={{ 
-            position: 'sticky', 
-            right: '24px', 
-            width: 0, 
-            height: '40px', 
-            display: 'flex', 
-            alignItems: 'center', 
-            zIndex: 30, 
-            overflow: 'visible',
+
+          {/* Floating "Add column" button — appears on header hover */}
+          <div style={{
+            position: 'sticky', right: '24px', width: 0, height: '40px',
+            display: 'flex', alignItems: 'center', zIndex: 30, overflow: 'visible',
             opacity: headerHovered ? 1 : 0,
             transition: 'opacity 0.2s ease',
-            pointerEvents: headerHovered ? 'auto' : 'none'
+            pointerEvents: headerHovered ? 'auto' : 'none',
           }}>
-            <button 
+            <button
               onClick={handleAddColumn}
               style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--primary-color)',
-                color: '#fff',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '20px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                width: '28px', height: '28px', borderRadius: '50%',
+                backgroundColor: 'var(--primary-color)', color: '#fff',
+                border: 'none', cursor: 'pointer', fontSize: '20px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                transform: 'translateX(50%)'
+                transform: 'translateX(50%)',
               }}
               title="Добавить столбец"
-            >
-              +
-            </button>
+            >+</button>
           </div>
         </div>
 
-        {error && (
-          <div style={{ padding: '20px', color: 'var(--danger-color)' }}>
-            {error}
-          </div>
-        )}
-        {/* Virtualized Rows */}
+        {error && <div style={{ padding: '20px', color: 'var(--danger-color)' }}>{error}</div>}
+
+        {/* ── Virtualised Rows ───────────────────────────────────────────────── */}
         {rowVirtualizer.getVirtualItems().map(virtualRow => {
           const item = gridItems[virtualRow.index];
-          
+          const baseStyle = {
+            top: `${virtualRow.start + 40}px`,
+            height: `${virtualRow.size}px`,
+            width: `${totalWidth}px`,
+          };
+
           if (item.type === 'month-header') {
             return (
-              <div 
+              <div
                 key={virtualRow.index}
                 className={styles.monthHeaderRow}
-                style={{
-                  top: `${virtualRow.start + 40}px`,
-                  height: `${virtualRow.size}px`,
-                  width: `${totalWidth}px`
-                }}
+                style={baseStyle}
                 onClick={() => toggleMonth(item.monthKey)}
               >
                 <div className={styles.monthHeaderContent}>
@@ -608,109 +578,76 @@ export const DataGrid: React.FC<DataGridProps> = ({
           }
 
           const row = item.row;
-            return (
-              <div 
-                key={virtualRow.index}
-                className={styles.row}
-                style={{
-                  top: `${virtualRow.start + 40}px`, // +40 for header
-                  height: `${virtualRow.size}px`,
-                  width: `${totalWidth}px`
-                }}
-              >
-                {row.rawDate === todayStr && (
-                  <div className={styles.currentDayOverlay} />
-                )}
-                {/* Date Cell (Sticky) */}
-                <div 
-                  className={`${styles.cell} ${styles.dateCell}`}
-                  style={{ width: columns[0].width, cursor: 'default' }}
-                  onClick={scrollToToday}
-                >
-                  {row.date}
-                </div>
+          const isToday = row.rawDate === todayStr;
 
-              {/* Data Columns */}
+          return (
+            <div key={virtualRow.index} className={styles.row} style={{ ...baseStyle, position: 'absolute', left: 0 }}>
+              {isToday && <div className={styles.currentDayOverlay} />}
+
+              {/* Sticky date cell */}
+              <div
+                className={`${styles.cell} ${styles.dateCell}`}
+                style={{ width: columns[0].width, cursor: 'default' }}
+                onClick={scrollToToday}
+              >
+                {row.date}
+              </div>
+
+              {/* Data cells */}
               {dataColumns.map((col, colIndex) => {
                 const actualColIndex = colIndex + 1;
-                const cellData = row.data[col.id] || { text: '', color: '' };
+                const cellData: CellData = row.data[col.id] || { text: '', color: '' };
                 const selected = isCellSelected(virtualRow.index, actualColIndex);
-                const activeProjectForCell = activeProjectsContext[col.id]?.[item.originalIndex];
-                
-                const hasLegacyText = cellData.text && !['Выходной', 'Отсыпной', 'СТОП'].includes(cellData.text.trim()) && cellData.text.trim().length > 0;
-                const isWorkingShift = cellData.cellType === 'shift' || cellData.staff?.length || cellData.dayType || cellData.cars?.length || hasLegacyText;
+                const activeProjectForCell = activeProjectsContext[col.id]?.[item.originalIndex] ?? null;
+
+                const isProjectStart = cellData.cellType === 'project_start' || (!cellData.cellType && !!cellData.projectName);
+                const hasLegacyText = !!cellData.text && !['Выходной', 'Отсыпной', 'СТОП'].includes(cellData.text.trim()) && cellData.text.trim().length > 0;
+                const isWorkingShift = cellData.cellType === 'shift' || !!cellData.staff?.length || !!cellData.dayType || !!cellData.cars?.length || hasLegacyText;
                 const isWeekend = cellData.text === 'Выходной' || cellData.dayType === 'выходной' || cellData.text === 'Отсыпной' || cellData.dayType === 'отсыпной';
                 const isStop = cellData.text === 'СТОП' || cellData.dayType === 'стоп';
-                const isCellInProject = activeProjectForCell && (isWorkingShift || isWeekend || cellData.cellType === 'shift' || cellData.cellType === 'day_off');
-                
-                let mappedColor;
-                if (cellData.cellType === 'project_start' || (!cellData.cellType && cellData.projectName)) {
-                   mappedColor = cellData.color ? (getDarkThemeColor(cellData.color) || cellData.color) : 'var(--primary-color)';
-                } else if (isWeekend) {
-                   mappedColor = themeSettings.weekendColor;
-                } else if (isStop) {
-                   mappedColor = themeSettings.stopColor;
-                } else if (cellData.dayType === 'павильон') {
-                   mappedColor = themeSettings.pavilionColor;
-                } else if (cellData.dayType === 'склад') {
-                   mappedColor = themeSettings.warehouseColor;
-                } else if (cellData.dayType === 'переезд') {
-                   mappedColor = themeSettings.transferColor;
-                } else if (isWorkingShift) {
-                   mappedColor = cellData.color ? (getDarkThemeColor(cellData.color) || cellData.color) : themeSettings.shiftColor;
-                } else {
-                   mappedColor = undefined;
-                }
-                
+                const isCellInProject = !!activeProjectForCell && !isProjectStart && (isWorkingShift || isWeekend);
+
+                const mappedColor = resolveCellColor(cellData, isWeekend, isStop, isWorkingShift);
+                const textColor = selected ? undefined : getContrastYIQ(mappedColor);
+
+                // Highlight filter
                 let cellClass = styles.cell;
                 if (selected) cellClass += ` ${styles.selected}`;
-                
                 if (highlightText || highlightColor || highlightColumnId) {
-                  let isMatch = false;
-                  if (highlightColumnId === col.id) {
-                    isMatch = true;
-                  } else {
-                    if (highlightText && cellData.text?.includes(highlightText)) isMatch = true;
-                    if (highlightColor && cellData.color === highlightColor) isMatch = true;
-                  }
-                  
-                  if (isMatch) cellClass += ` ${styles.highlighted}`;
-                  else cellClass += ` ${styles.dimmed}`;
+                  const isMatch =
+                    highlightColumnId === col.id ||
+                    (!!highlightText && cellData.text?.includes(highlightText)) ||
+                    (!!highlightColor && cellData.color === highlightColor);
+                  cellClass += isMatch ? ` ${styles.highlighted}` : ` ${styles.dimmed}`;
                 }
 
-                const textColor = selected ? undefined : (mappedColor ? getContrastYIQ(mappedColor) : undefined);
-
                 return (
-                  <div 
+                  <div
                     key={col.id}
                     className={cellClass}
-                    style={{ 
-                      width: col.width,
-                      backgroundColor: selected ? undefined : mappedColor,
-                      color: textColor,
-                      position: 'relative'
-                    }}
+                    style={{ width: col.width, backgroundColor: selected ? undefined : mappedColor, color: textColor, position: 'relative' }}
                     onMouseDown={() => handleMouseDown(virtualRow.index, actualColIndex)}
                     onMouseEnter={() => handleMouseEnter(virtualRow.index, actualColIndex)}
                     onClick={() => setActiveCell({ rowIndex: virtualRow.index, colIndex: actualColIndex })}
                   >
-                    {/* Add a translucent background over custom color if selected */}
                     {selected && mappedColor && (
-                      <div className={styles.selectionOverlay} style={{ backgroundColor: mappedColor }}></div>
+                      <div className={styles.selectionOverlay} style={{ backgroundColor: mappedColor }} />
                     )}
-                    {/* Active Project Glow */}
-                    {isCellInProject && activeProjectForCell && cellData.cellType !== 'project_start' && (
-                      <div style={{ position: 'absolute', inset: 0, boxShadow: `inset 0 0 16px ${activeProjectForCell.color}${isWeekend ? '0D' : '1A'}`, pointerEvents: 'none', zIndex: 1, borderRadius: '4px' }}></div>
+                    {isCellInProject && (
+                      <div style={{
+                        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1, borderRadius: '4px',
+                        boxShadow: `inset 0 0 16px ${activeProjectForCell!.color}${isWeekend ? '0D' : '1A'}`,
+                      }} />
                     )}
                     <span className={styles.cellText} style={{ zIndex: 2 }}>
-                      {cellData.cellType === 'project_start' || (!cellData.cellType && cellData.projectName) ? (
-                         <span style={{ fontWeight: 'bold', color: getContrastYIQ(mappedColor) }}>{cellData.projectName || cellData.text}</span>
+                      {isProjectStart ? (
+                        <span style={{ fontWeight: 'bold', color: textColor }}>{cellData.projectName || cellData.text}</span>
                       ) : (
-                         <>
-                           {cellData.staff && cellData.staff.length > 0 ? cellData.staff.join(', ') : cellData.text}
-                           {cellData.cars && cellData.cars.length > 0 && ' 🚗'}
-                           {cellData.dayType && cellData.dayType !== 'выходной' && cellData.dayType !== 'отсыпной' && cellData.dayType !== 'стоп' && ` [${cellData.dayType}]`}
-                         </>
+                        <>
+                          {cellData.staff?.length ? cellData.staff.join(', ') : cellData.text}
+                          {!!cellData.cars?.length && ' 🚗'}
+                          {cellData.dayType && !['выходной', 'отсыпной', 'стоп'].includes(cellData.dayType) && ` [${cellData.dayType}]`}
+                        </>
                       )}
                     </span>
                   </div>
@@ -721,82 +658,67 @@ export const DataGrid: React.FC<DataGridProps> = ({
         })}
       </div>
 
-      {/* Cell Settings Modal */}
-      {activeCell && gridItems[activeCell.rowIndex] && gridItems[activeCell.rowIndex].type === 'row' && (
-        <CellSettingsModal
-          isOpen={true}
-          onClose={() => setActiveCell(null)}
-          staffList={staffList}
-          cars={cars}
-          date={(gridItems[activeCell.rowIndex] as any).row.date}
-          columnName={columns[activeCell.colIndex].name}
-          initialData={(gridItems[activeCell.rowIndex] as any).row.data[columns[activeCell.colIndex].id] || {}}
-          activeProject={activeProjectsContext[columns[activeCell.colIndex].id]?.[(gridItems[activeCell.rowIndex] as any).originalIndex] || null}
-          onSave={async (newData) => {
-            const item = gridItems[activeCell.rowIndex];
-            if (item.type !== 'row') return;
-            const row = item.row;
-            const col = columns[activeCell.colIndex];
-            
-            const oldCell = row.data[col.id] || ({} as CellData);
-            const isDeletingStart = (oldCell as any).cellType === 'project_start' && newData.cellType !== 'project_start';
-            
-            const isoDate = row.rawDate;
-            const fullData = { 
-              ...row.data, 
-              [col.id]: Object.keys(newData).length === 0 ? undefined : {
-                ...row.data[col.id],
-                ...newData,
-                text: newData.text || '',
-                color: newData.color || ''
-              }
-            };
-            if (Object.keys(newData).length === 0) delete fullData[col.id];
+      {/* ── Cell Settings Modal ──────────────────────────────────────────────── */}
+      {activeCell && gridItems[activeCell.rowIndex]?.type === 'row' && (() => {
+        const item = gridItems[activeCell.rowIndex] as Extract<GridItem, { type: 'row' }>;
+        const col = columns[activeCell.colIndex];
+        return (
+          <CellSettingsModal
+            isOpen={true}
+            onClose={() => setActiveCell(null)}
+            staffList={staffList}
+            cars={cars}
+            date={item.row.date}
+            columnName={col.name}
+            initialData={item.row.data[col.id] || {}}
+            activeProject={activeProjectsContext[col.id]?.[item.originalIndex] ?? null}
+            onSave={async (newData) => {
+              const row = item.row;
+              const oldCell = (row.data[col.id] || {}) as CellData;
+              const isDeletingProjectStart = (oldCell as any).cellType === 'project_start' && newData.cellType !== 'project_start';
 
-            try {
-              if (isDeletingStart) {
-                 const updates = [];
-                 updates.push({ date: isoDate, data: fullData });
-                 const newRows = [...rows];
-                 newRows[item.originalIndex] = { ...row, data: fullData };
-                 
-                 for (let i = item.originalIndex + 1; i < rows.length; i++) {
+              const fullData: Record<string, any> = { ...row.data };
+              if (Object.keys(newData).length === 0) {
+                delete fullData[col.id];
+              } else {
+                fullData[col.id] = { ...row.data[col.id], ...newData, text: newData.text || '', color: newData.color || '' };
+              }
+
+              try {
+                if (isDeletingProjectStart) {
+                  // Cascade-delete all cells in this column until the next STOP
+                  const updates = [{ date: row.rawDate, data: fullData }];
+                  const newRows = [...rows];
+                  newRows[item.originalIndex] = { ...row, data: fullData };
+
+                  for (let i = item.originalIndex + 1; i < rows.length; i++) {
                     const nextRow = rows[i];
                     const nextCell = nextRow.data[col.id] as any;
-                    if (nextCell) {
-                       const nextFullData = { ...nextRow.data };
-                       delete nextFullData[col.id];
-                       updates.push({ date: nextRow.rawDate, data: nextFullData });
-                       newRows[i] = { ...nextRow, data: nextFullData };
-                       if (nextCell.cellType === 'stop' || nextCell.dayType === 'стоп' || nextCell.text === 'СТОП') {
-                          break;
-                       }
-                    }
-                 }
-                 
-                 for (const u of updates) {
-                   await apiClient.put('/schedule', u);
-                 }
-                 setRows(newRows);
-              } else {
-                 await apiClient.put('/schedule', {
-                   date: isoDate,
-                   data: fullData
-                 });
-                 const newRows = [...rows];
-                 newRows[item.originalIndex] = { ...row, data: fullData };
-                 setRows(newRows);
-              }
-              
-              setActiveCell(null);
-            } catch (err) {
-              console.error('Failed to save cell data', err);
-              alert('Ошибка сохранения');
-            }
-          }}
-        />
-      )}
+                    if (!nextCell) continue;
+                    const nextData = { ...nextRow.data };
+                    delete nextData[col.id];
+                    updates.push({ date: nextRow.rawDate, data: nextData });
+                    newRows[i] = { ...nextRow, data: nextData };
+                    if (nextCell.cellType === 'stop' || nextCell.dayType === 'стоп' || nextCell.text === 'СТОП') break;
+                  }
 
+                  await Promise.all(updates.map(u => apiClient.put('/schedule', u)));
+                  setRows(newRows);
+                } else {
+                  await apiClient.put('/schedule', { date: row.rawDate, data: fullData });
+                  const newRows = [...rows];
+                  newRows[item.originalIndex] = { ...row, data: fullData };
+                  setRows(newRows);
+                }
+                setActiveCell(null);
+              } catch (err) {
+                console.error('Failed to save cell data', err);
+                alert('Ошибка сохранения');
+              }
+            }}
+          />
+        );
+      })()}
     </div>
   );
 };

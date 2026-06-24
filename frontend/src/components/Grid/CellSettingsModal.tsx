@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import styles from './CellSettingsModal.module.css';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface StructuredData {
   cellType?: 'project_start' | 'shift' | 'day_off' | 'stop' | '';
@@ -18,159 +20,153 @@ interface CellSettingsModalProps {
   onSave: (data: StructuredData) => void;
   initialData: StructuredData;
   date: string;
-  columnName: string;
+  columnName: string; // kept for API compat, not rendered
   staffList: string[];
   cars: any[];
   activeProject: { name: string; color: string } | null;
 }
 
-export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
-  isOpen, onClose, onSave, initialData, date, columnName, staffList, cars, activeProject
-}) => {
-  const shiftDayTypeOptions = ['натура', 'павильон', 'склад', 'переезд'];
-  const extraOptions = ['погрузка', 'разгрузка'];
-  // Pre-defined vibrant colors for projects
-  const projectColors = ['#e06666', '#f6b26b', '#ffd966', '#93c47d', '#76a5af', '#9fc5e8', '#8e7cc3', '#c27ba0'];
+// ─── Constants (module-level, never re-created) ────────────────────────────────
 
+const SHIFT_DAY_TYPES = ['натура', 'павильон', 'склад', 'переезд'] as const;
+const EXTRA_OPTIONS = ['погрузка', 'разгрузка'] as const;
+const PROJECT_COLORS = ['#e06666', '#f6b26b', '#ffd966', '#93c47d', '#76a5af', '#9fc5e8', '#8e7cc3', '#c27ba0'];
+
+// ─── Auto-detect cell type from legacy flat data ───────────────────────────────
+
+const detectLegacyCellType = (d: StructuredData, hasActiveProject: boolean): StructuredData['cellType'] => {
+  if (d.cellType) return d.cellType;
+  if (d.dayType === 'стоп' || d.text === 'СТОП') return 'stop';
+  if (d.dayType === 'выходной' || d.dayType === 'отсыпной' || d.text === 'Выходной' || d.text === 'Отсыпной') return 'day_off';
+  if (d.projectName || (d.text && !hasActiveProject && !d.staff?.length && !d.cars?.length)) return 'project_start';
+  if (d.staff?.length || d.cars?.length || d.dayType || d.text) return 'shift';
+  return '';
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
+  isOpen, onClose, onSave, initialData, date, staffList, cars, activeProject,
+}) => {
   const [data, setData] = useState<StructuredData>({});
 
+  // Reset form whenever the modal opens for a new cell
   useEffect(() => {
-    if (isOpen) {
-      let type = initialData.cellType;
-      
-      // Auto-detect legacy cell types
-      if (!type) {
-        if (initialData.dayType === 'стоп' || initialData.text === 'СТОП') type = 'stop';
-        else if (initialData.dayType === 'выходной' || initialData.dayType === 'отсыпной' || initialData.text === 'Выходной' || initialData.text === 'Отсыпной') type = 'day_off';
-        else if (initialData.projectName || (initialData.text && !activeProject && !initialData.staff?.length && !initialData.cars?.length)) type = 'project_start';
-        else if (initialData.staff?.length || initialData.cars?.length || initialData.dayType || initialData.text) type = 'shift';
-        else type = '';
-      }
+    if (!isOpen) return;
 
-      let parsedStaff = initialData.staff || [];
-      if (!initialData.staff && initialData.text && type === 'shift') {
-        const exclude = ['Выходной', 'СТОП', 'Нет', 'ОТМЕНА', 'СМЕНЫ', 'СВОИ', 'ЛИЦЕМЕРЫ', 'Фестиваль'];
-        const words = initialData.text.split(/[\s/(),[\]]+/);
-        const foundStaff = new Set<string>();
-        words.forEach((w: string) => {
-          const cleanWord = w.replace(/[^\p{L}]/gu, '');
-          if (cleanWord.length > 2 && cleanWord[0] === cleanWord[0].toUpperCase() && cleanWord[0] !== cleanWord[0].toLowerCase() && !exclude.includes(cleanWord)) {
-            foundStaff.add(cleanWord);
-          }
-        });
-        parsedStaff = Array.from(foundStaff);
-      }
+    const type = detectLegacyCellType(initialData, !!activeProject);
 
-      let parsedCars = initialData.cars || [];
-      if (!initialData.cars && initialData.text && type === 'shift') {
-        const foundCar = cars.find(c => {
-          const emoji = c.label.match(/\p{Emoji}/u)?.[0];
-          return emoji && initialData.text!.includes(emoji);
-        });
-        if (foundCar) parsedCars = [foundCar.label];
-      }
-
-      setData({
-        ...initialData,
-        cellType: type,
-        projectName: initialData.projectName || (type === 'project_start' ? initialData.text : ''),
-        staff: parsedStaff,
-        cars: parsedCars,
-        dayType: initialData.dayType || '',
-        options: initialData.options || []
-      });
+    // Parse legacy staff names from flat text
+    let parsedStaff = initialData.staff ?? [];
+    if (!initialData.staff && initialData.text && type === 'shift') {
+      const exclude = new Set(['Выходной', 'СТОП', 'Нет', 'ОТМЕНА', 'СМЕНЫ', 'СВОИ', 'ЛИЦЕМЕРЫ', 'Фестиваль']);
+      parsedStaff = Array.from(
+        new Set(
+          initialData.text
+            .split(/[\s/(),[|\]]+/)
+            .map(w => w.replace(/[^\p{L}]/gu, ''))
+            .filter(w => w.length > 2 && /^\p{Lu}/u.test(w) && !exclude.has(w)),
+        ),
+      );
     }
-  }, [isOpen, initialData, cars, activeProject]);
+
+    // Parse legacy car emoji from flat text
+    let parsedCars = initialData.cars ?? [];
+    if (!initialData.cars && initialData.text && type === 'shift') {
+      const found = cars.find(c => {
+        const emoji = c.label.match(/\p{Emoji}/u)?.[0];
+        return emoji && initialData.text!.includes(emoji);
+      });
+      if (found) parsedCars = [found.label];
+    }
+
+    setData({
+      ...initialData,
+      cellType: type,
+      projectName: initialData.projectName ?? (type === 'project_start' ? initialData.text : ''),
+      staff: parsedStaff,
+      cars: parsedCars,
+      dayType: initialData.dayType ?? '',
+      options: initialData.options ?? [],
+    });
+  }, [isOpen, initialData]); // intentionally excludes `cars`/`activeProject` — changes there must not reset an open form
 
   if (!isOpen) return null;
 
-  const availableTypes = activeProject 
-    ? [
-        {val: 'shift', label: 'Смена'}, 
-        {val: 'day_off', label: 'Выходной / Отсыпной'}, 
-        {val: 'stop', label: 'Стоп (Закрыть проект)'}
-      ]
-    : [
-        {val: 'project_start', label: 'Старт проекта'}
-      ];
+  // ─── Derived values (computed per render but cheap) ────────────────────────
 
-  const primaryColor = activeProject?.color || 'var(--primary-color)';
+  const availableTypes = activeProject
+    ? [
+        { val: 'shift', label: 'Смена' },
+        { val: 'day_off', label: 'Выходной / Отсыпной' },
+        { val: 'stop', label: 'Стоп (Закрыть проект)' },
+      ]
+    : [{ val: 'project_start', label: 'Старт проекта' }];
+
+  const primaryColor = activeProject?.color ?? 'var(--primary-color)';
   const glowStyle = activeProject ? `0 0 20px ${activeProject.color}4D` : 'none';
 
-  const handleClear = () => {
-    setData({ cellType: '' });
-  };
+  // ─── Handlers ─────────────────────────────────────────────────────────────
+
+  const handleClear = () => setData({ cellType: '' });
 
   const handleAddStaff = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
-    if (!val) return;
-    if (!data.staff?.includes(val)) {
-      setData(prev => ({ ...prev, staff: [...(prev.staff || []), val] }));
-    }
+    if (!val || data.staff?.includes(val)) return;
+    setData(prev => ({ ...prev, staff: [...(prev.staff ?? []), val] }));
     e.target.value = '';
   };
 
-  const handleRemoveStaff = (name: string) => {
+  const handleRemoveStaff = (name: string) =>
     setData(prev => ({ ...prev, staff: prev.staff?.filter(s => s !== name) }));
-  };
 
-  const toggleCar = (carLabel: string) => {
-    const current = data.cars || [];
-    if (current.includes(carLabel)) {
-      setData(prev => ({ ...prev, cars: current.filter(c => c !== carLabel) }));
-    } else {
-      setData(prev => ({ ...prev, cars: [...current, carLabel] }));
-    }
-  };
+  const toggleCar = (label: string) =>
+    setData(prev => {
+      const current = prev.cars ?? [];
+      return { ...prev, cars: current.includes(label) ? current.filter(c => c !== label) : [...current, label] };
+    });
 
-  const toggleOption = (opt: string) => {
-    const current = data.options || [];
-    if (current.includes(opt)) {
-      setData(prev => ({ ...prev, options: current.filter(c => c !== opt) }));
-    } else {
-      setData(prev => ({ ...prev, options: [...current, opt] }));
-    }
-  };
+  const toggleOption = (opt: string) =>
+    setData(prev => {
+      const current = prev.options ?? [];
+      return { ...prev, options: current.includes(opt) ? current.filter(c => c !== opt) : [...current, opt] };
+    });
 
   const handleSave = () => {
-    if (!data.cellType) {
-      onSave({}); // empty cell
-      return;
-    }
-    
+    if (!data.cellType) { onSave({}); return; }
+
     if (data.cellType === 'shift' && !data.dayType) {
       alert('Пожалуйста, выберите локацию (натура, павильон и т.д.) для этой смены.');
       return;
     }
 
     let text = '';
-    let color = data.color || '';
-    
+    let color = data.color ?? '';
+
     if (data.cellType === 'project_start') {
       text = data.projectName?.trim() || 'Новый проект';
-      if (!color) color = projectColors[Math.floor(Math.random() * projectColors.length)];
+      if (!color) color = PROJECT_COLORS[Math.floor(Math.random() * PROJECT_COLORS.length)];
     } else if (data.cellType === 'stop') {
       text = 'СТОП';
     } else if (data.cellType === 'day_off') {
       text = data.dayType === 'отсыпной' ? 'Отсыпной' : 'Выходной';
     } else if (data.cellType === 'shift') {
-      text = data.staff && data.staff.length > 0 ? data.staff.join(' ') : '';
+      text = data.staff?.length ? data.staff.join(' ') : '';
       if (data.dayType) text += ` [${data.dayType}]`;
-      if (data.options && data.options.length > 0) text += ` (${data.options.join(', ')})`;
-      
-      if (data.cars && data.cars.length > 0) {
-        const carObj = cars.find(c => c.label === data.cars![0]);
-        if (carObj) color = carObj.color;
-      }
+      if (data.options?.length) text += ` (${data.options.join(', ')})`;
+      const carObj = cars.find(c => c.label === data.cars?.[0]);
+      if (carObj) color = carObj.color;
     }
 
     onSave({ ...data, text, color });
   };
 
+  // ─── Render ───────────────────────────────────────────────────────────────
+
   return (
     <div className={styles.overlay} onMouseDown={onClose}>
-      <div 
-        className={styles.modal} 
+      <div
+        className={styles.modal}
         onMouseDown={e => e.stopPropagation()}
         style={{ boxShadow: glowStyle }}
       >
@@ -181,46 +177,45 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
           </h2>
           <button className={styles.closeBtn} onClick={onClose}>&times;</button>
         </div>
-        
-        <div className={styles.body}>
 
+        <div className={styles.body}>
+          {/* Cell type selector */}
           <div className={styles.formGroup}>
             <label>Тип ячейки</label>
-            <select 
-              className={styles.select} 
+            <select
+              className={styles.select}
               value={data.cellType || ''}
-              onChange={(e) => setData({ cellType: e.target.value as any, projectName: data.projectName, color: data.color })}
+              onChange={e => setData({ cellType: e.target.value as any, projectName: data.projectName, color: data.color })}
             >
               <option value="" disabled>(Не выбран)</option>
-              {availableTypes.map(t => (
-                <option key={t.val} value={t.val}>{t.label}</option>
-              ))}
+              {availableTypes.map(t => <option key={t.val} value={t.val}>{t.label}</option>)}
             </select>
           </div>
 
+          {/* project_start fields */}
           {data.cellType === 'project_start' && (
             <>
               <div className={styles.formGroup}>
                 <label>Название проекта</label>
-                <input 
-                  type="text" 
-                  className={styles.select} // reusing input-like styling
+                <input
+                  type="text"
+                  className={styles.select}
                   style={{ width: '100%', padding: '8px', border: '1px solid var(--border-color)', borderRadius: '4px', background: 'var(--input-bg)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
                   placeholder="Введите название проекта..."
                   value={data.projectName || ''}
-                  onChange={e => setData(prev => ({...prev, projectName: e.target.value}))}
+                  onChange={e => setData(prev => ({ ...prev, projectName: e.target.value }))}
                 />
               </div>
               <div className={styles.formGroup}>
                 <label>Цвет проекта</label>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {projectColors.map(c => (
-                    <div 
+                  {PROJECT_COLORS.map(c => (
+                    <div
                       key={c}
-                      onClick={() => setData(prev => ({...prev, color: c}))}
+                      onClick={() => setData(prev => ({ ...prev, color: c }))}
                       style={{
                         width: '24px', height: '24px', borderRadius: '4px', backgroundColor: c, cursor: 'pointer',
-                        border: data.color === c ? '2px solid var(--text-primary)' : '1px solid var(--border-color)'
+                        border: data.color === c ? '2px solid var(--text-primary)' : '1px solid var(--border-color)',
                       }}
                     />
                   ))}
@@ -229,13 +224,14 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
             </>
           )}
 
+          {/* day_off sub-type */}
           {data.cellType === 'day_off' && (
             <div className={styles.formGroup}>
               <label>Тип выходного</label>
-              <select 
-                className={styles.select} 
+              <select
+                className={styles.select}
                 value={data.dayType || 'выходной'}
-                onChange={e => setData(prev => ({...prev, dayType: e.target.value}))}
+                onChange={e => setData(prev => ({ ...prev, dayType: e.target.value }))}
               >
                 <option value="выходной">Выходной</option>
                 <option value="отсыпной">Отсыпной</option>
@@ -243,17 +239,18 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
             </div>
           )}
 
+          {/* shift fields */}
           {data.cellType === 'shift' && (
             <>
               <div className={styles.formGroup}>
-                <label>Локация (опционально)</label>
-                <select 
-                  className={styles.select} 
-                  value={shiftDayTypeOptions.includes(data.dayType || '') ? data.dayType : ''}
-                  onChange={e => setData(prev => ({...prev, dayType: e.target.value}))}
+                <label>Локация</label>
+                <select
+                  className={styles.select}
+                  value={SHIFT_DAY_TYPES.includes(data.dayType as any) ? data.dayType : ''}
+                  onChange={e => setData(prev => ({ ...prev, dayType: e.target.value }))}
                 >
                   <option value="">(Не выбрано)</option>
-                  {shiftDayTypeOptions.map(dt => (
+                  {SHIFT_DAY_TYPES.map(dt => (
                     <option key={dt} value={dt}>{dt.charAt(0).toUpperCase() + dt.slice(1)}</option>
                   ))}
                 </select>
@@ -282,11 +279,7 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
                 <div className={styles.checkboxList}>
                   {cars.map(car => (
                     <label key={car.id} className={styles.checkboxLabel}>
-                      <input 
-                        type="checkbox" 
-                        checked={(data.cars || []).includes(car.label)}
-                        onChange={() => toggleCar(car.label)}
-                      />
+                      <input type="checkbox" checked={(data.cars ?? []).includes(car.label)} onChange={() => toggleCar(car.label)} />
                       {car.label}
                     </label>
                   ))}
@@ -296,13 +289,9 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
               <div className={styles.formGroup}>
                 <label>Доп. опции</label>
                 <div className={styles.checkboxList}>
-                  {extraOptions.map(opt => (
+                  {EXTRA_OPTIONS.map(opt => (
                     <label key={opt} className={styles.checkboxLabel}>
-                      <input 
-                        type="checkbox" 
-                        checked={(data.options || []).includes(opt)}
-                        onChange={() => toggleOption(opt)}
-                      />
+                      <input type="checkbox" checked={(data.options ?? []).includes(opt)} onChange={() => toggleOption(opt)} />
                       {opt}
                     </label>
                   ))}
@@ -310,9 +299,9 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
               </div>
             </>
           )}
-
         </div>
-        <div className={styles.footer} style={{ display: 'flex', flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: '12px' }}>
+
+        <div className={styles.footer} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '12px' }}>
           <button className={styles.cancelBtn} style={{ color: 'var(--danger-color)', marginRight: 'auto' }} onClick={handleClear}>Очистить</button>
           <button className={styles.cancelBtn} onClick={onClose}>Отмена</button>
           <button className={styles.saveBtn} style={{ backgroundColor: primaryColor }} onClick={handleSave}>Сохранить</button>
