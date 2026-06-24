@@ -478,8 +478,15 @@ export const DataGrid: React.FC<DataGridProps> = ({
         >
           {(() => {
             const virtualItems = rowVirtualizer.getVirtualItems();
-            const topItem = virtualItems[0] ? gridItems[virtualItems[0].index] : null;
-            const topOriginalIndex = topItem?.type === 'row' ? topItem.originalIndex : 0;
+            // Skip month-header virtual rows — find the first visible *data* row
+            // so the sticky project overlay never falls back to row 0 by mistake
+            const topOriginalIndex = (() => {
+              for (const vi of virtualItems) {
+                const item = gridItems[vi.index];
+                if (item?.type === 'row') return item.originalIndex;
+              }
+              return 0;
+            })();
 
             return columns.map((col, index) => {
               const activeProjForHeader =
