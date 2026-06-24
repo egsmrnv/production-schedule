@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { apiClient } from '../../api/client';
 import { CellSettingsModal } from './CellSettingsModal';
 import { ColumnSettingsModal } from './ColumnSettingsModal';
 import { type ThemeSettings, DEFAULT_THEME } from './DesignSettingsModal';
