@@ -45,10 +45,8 @@ export interface DataGridProps {
 
 const getDarkThemeColor = (color: string) => {
   const lower = color.toLowerCase();
-  if (lower === '#cccccc') return '#161618'; // Extremely dark grey for weekends
   if (lower === '#b6d7a8') return '#1e4620'; // Deep Green
   if (lower === '#fff2cc') return '#5c4008'; // Deep Yellow
-  if (lower === '#efefef') return '#2c2c2e'; // Light Grey -> Darker Grey
   if (lower === '#f4cccc') return '#5c1e1e'; // Deep Red
   if (lower === '#ffe599' || lower === '#ffd966') return '#7f6000'; // Желтый (павильон)
   if (lower === '#e06666' || lower === '#cc0000') return '#660000'; // Красный (стоп)
