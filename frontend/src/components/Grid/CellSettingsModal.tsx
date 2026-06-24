@@ -18,18 +18,14 @@ interface CellSettingsModalProps {
   date: string;
   columnName: string;
   staffList: string[];
+  cars: any[];
 }
 
 export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
-  isOpen, onClose, onSave, initialData, date, columnName, staffList
+  isOpen, onClose, onSave, initialData, date, columnName, staffList, cars
 }) => {
-  const carsOptions = [
-    { id: 'white', label: '⬛️/⚫️ Белый спринтер/крафтер', color: '#cccccc' },
-    { id: 'green', label: '🟢 Зеленый спринтер', color: '#b6d7a8' },
-    { id: 'orange', label: '🟠 Оранжевый', color: '#fce5cd' },
-  ];
 
-  const dayTypeOptions = ['натура', 'павильон', 'склад', 'переезд'];
+  const dayTypeOptions = ['натура', 'павильон', 'склад', 'переезд', 'выходной'];
   const extraOptions = ['погрузка', 'разгрузка'];
 
   const [data, setData] = useState<StructuredData>({});
@@ -57,8 +53,19 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
       }
 
       let parsedCars = initialData.cars || [];
-      if (!initialData.cars && initialData.color) {
-        const matchedCar = carsOptions.find(c => c.color.toLowerCase() === initialData.color?.toLowerCase());
+      if (!initialData.cars && initialData.text) {
+        // Parse legacy cars from emojis in text
+        const foundCar = cars.find(c => {
+          // Extract emoji from car.label if any (assume first character is emoji)
+          const emoji = c.label.match(/\p{Emoji}/u)?.[0];
+          return emoji && initialData.text!.includes(emoji);
+        });
+        if (foundCar) parsedCars = [foundCar.label];
+      }
+
+      // If text didn't match, maybe we can fallback to color mapping? 
+      if (!initialData.cars && parsedCars.length === 0 && initialData.color) {
+        const matchedCar = cars.find(c => c.color.toLowerCase() === initialData.color?.toLowerCase());
         if (matchedCar) parsedCars = [matchedCar.label];
       }
 
@@ -127,7 +134,7 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
     // Determine cell color from cars
     let color = data.color || '';
     if (data.cars && data.cars.length > 0) {
-      const carObj = carsOptions.find(c => c.label === data.cars![0]);
+      const carObj = cars.find(c => c.label === data.cars![0]);
       if (carObj) color = carObj.color;
     }
 
@@ -164,7 +171,7 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
           <div className={styles.formGroup}>
             <label>Машины</label>
             <div className={styles.checkboxList}>
-              {carsOptions.map(car => (
+              {cars.map(car => (
                 <label key={car.id} className={styles.checkboxLabel}>
                   <input 
                     type="checkbox" 

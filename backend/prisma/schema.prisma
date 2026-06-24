@@ -27,6 +27,14 @@ model ProjectColumn {
   updatedAt DateTime @updatedAt
 }
 
+model Car {
+  id        String   @id @default(uuid())
+  label     String
+  color     String   @default("#cccccc")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model ScheduleDate {
   id        String   @id @default(uuid())
   date      String   @unique // Формат: YYYY-MM-DD

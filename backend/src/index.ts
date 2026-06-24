@@ -106,6 +106,117 @@ app.post('/api/columns', requireAdmin, async (req, res) => {
   }
 });
 
+app.delete('/api/columns/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.projectColumn.delete({ where: { id } });
+    
+    // Cascade delete in JSON
+    const dates = await prisma.scheduleDate.findMany();
+    for (const d of dates) {
+      const data = d.data as Record<string, any>;
+      if (data[id]) {
+        delete data[id];
+        await prisma.scheduleDate.update({ where: { id: d.id }, data: { data } });
+      }
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// --- Admin Entity Management ---
+app.get('/api/admin/staff', requireAdmin, async (req, res) => {
+  const staff = await prisma.user.findMany({ where: { role: 'STAFF' } });
+  res.json(staff);
+});
+
+app.post('/api/admin/staff', requireAdmin, async (req, res) => {
+  const { name } = req.body;
+  try {
+    const staff = await prisma.user.create({ data: { name, role: 'STAFF' } });
+    res.json(staff);
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.delete('/api/admin/staff/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const staff = await prisma.user.findUnique({ where: { id } });
+    if (!staff) return res.status(404).json({ error: 'Not found' });
+    
+    await prisma.user.delete({ where: { id } });
+    
+    const dates = await prisma.scheduleDate.findMany();
+    for (const d of dates) {
+      let changed = false;
+      const data = d.data as Record<string, any>;
+      for (const colId in data) {
+        if (data[colId].staff && data[colId].staff.includes(staff.name)) {
+          data[colId].staff = data[colId].staff.filter((s: string) => s !== staff.name);
+          data[colId].text = data[colId].staff.join(' '); // fallback text update
+          changed = true;
+        }
+      }
+      if (changed) {
+        await prisma.scheduleDate.update({ where: { id: d.id }, data: { data } });
+      }
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.get('/api/admin/cars', requireAdmin, async (req, res) => {
+  const cars = await prisma.car.findMany();
+  res.json(cars);
+});
+
+app.post('/api/admin/cars', requireAdmin, async (req, res) => {
+  const { label, color } = req.body;
+  try {
+    const car = await prisma.car.create({ data: { label, color: color || '#cccccc' } });
+    res.json(car);
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.delete('/api/admin/cars/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const car = await prisma.car.findUnique({ where: { id } });
+    if (!car) return res.status(404).json({ error: 'Not found' });
+    
+    await prisma.car.delete({ where: { id } });
+    
+    const dates = await prisma.scheduleDate.findMany();
+    for (const d of dates) {
+      let changed = false;
+      const data = d.data as Record<string, any>;
+      for (const colId in data) {
+        if (data[colId].cars && data[colId].cars.includes(car.label)) {
+          data[colId].cars = data[colId].cars.filter((c: string) => c !== car.label);
+          changed = true;
+        }
+      }
+      if (changed) {
+        await prisma.scheduleDate.update({ where: { id: d.id }, data: { data } });
+      }
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // --- Staff Endpoints ---
 app.get('/api/staff/schedule', async (req, res) => {
   const { token } = req.query;

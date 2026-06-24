@@ -12,10 +12,10 @@
   --danger-color: #ff453a;
   
   /* Grid specific */
-  --grid-bg: #000000;
-  --grid-border: #38383a;
-  --cell-bg: #1c1c1e;
-  --cell-bg-hover: #2c2c2e;
+  --grid-bg: #121212;
+  --grid-border: #2c2c2e;
+  --cell-bg: #121212;
+  --cell-bg-hover: #1c1c1e;
   --cell-selected: rgba(10, 132, 255, 0.15);
   --cell-selected-border: #0a84ff;
   

@@ -38,6 +38,7 @@ export interface DataGridProps {
   highlightColor?: string;
   highlightColumnId?: string;
   staffList?: string[];
+  cars?: any[];
 }
 
 const getDarkThemeColor = (color: string) => {
@@ -57,7 +58,8 @@ export const DataGrid: React.FC<DataGridProps> = ({
   highlightText, 
   highlightColor, 
   highlightColumnId,
-  staffList = []
+  staffList = [],
+  cars = []
 }) => {
   const [columns, setColumns] = useState<Column[]>([
     { id: 'date', name: 'Дата', width: 100 }
@@ -302,7 +304,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
         style={{ height: `${rowVirtualizer.getTotalSize() + 40}px`, width: `${totalWidth}px` }}
       >
         {/* Header */}
-        <div className={styles.headerRow}>
+        <div className={styles.headerRow} style={{ width: `${totalWidth}px` }}>
           {columns.map(col => (
             <div key={col.id} className={styles.headerCell} style={{ width: col.width }}>
               {col.name}
@@ -325,7 +327,8 @@ export const DataGrid: React.FC<DataGridProps> = ({
               className={styles.row}
               style={{
                 top: `${virtualRow.start + 40}px`, // +40 for header
-                height: `${virtualRow.size}px`
+                height: `${virtualRow.size}px`,
+                width: `${totalWidth}px`
               }}
             >
               {/* Date Column (fixed/frozen look) */}
@@ -341,7 +344,16 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 const actualColIndex = colIndex + 1;
                 const cellData = row.data[col.id] || { text: '', color: '' };
                 const selected = isCellSelected(virtualRow.index, actualColIndex);
-                const mappedColor = cellData.color ? getDarkThemeColor(cellData.color) : undefined;
+                
+                const isWorkingShift = cellData.staff?.length || cellData.dayType || cellData.cars?.length;
+                const isWeekend = cellData.text === 'Выходной' || cellData.dayType === 'выходной';
+                
+                let mappedColor = cellData.color ? getDarkThemeColor(cellData.color) : undefined;
+                if (isWeekend) {
+                  mappedColor = '#121212';
+                } else if (isWorkingShift && !mappedColor) {
+                  mappedColor = '#1c1c1e';
+                }
                 
                 let cellClass = styles.cell;
                 if (selected) cellClass += ` ${styles.selected}`;
@@ -394,6 +406,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
           isOpen={true}
           onClose={() => setActiveCell(null)}
           staffList={staffList}
+          cars={cars}
           date={rows[activeCell.rowIndex].date}
           columnName={columns[activeCell.colIndex].name}
           initialData={rows[activeCell.rowIndex].data[columns[activeCell.colIndex].id] || {}}
