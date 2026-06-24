@@ -318,6 +318,13 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
+  const scrollToToday = () => {
+    const todayIndex = rows.findIndex(r => r.rawDate === todayStr);
+    if (todayIndex !== -1) {
+      rowVirtualizer.scrollToIndex(todayIndex, { align: 'center' });
+    }
+  };
+
   return (
     <div 
       className={styles.gridContainer} 
@@ -339,9 +346,10 @@ export const DataGrid: React.FC<DataGridProps> = ({
             <div 
               key={col.id} 
               className={styles.headerCell} 
+              onClick={index === 0 ? scrollToToday : undefined}
               style={{ 
                 width: col.width,
-                ...(index === 0 ? { position: 'sticky', left: 0, zIndex: 21, backgroundColor: 'var(--panel-bg)', borderRight: '1px solid var(--border-color)' } : {})
+                ...(index === 0 ? { position: 'sticky', left: 0, zIndex: 21, backgroundColor: 'var(--panel-bg)', borderRight: '1px solid var(--border-color)', cursor: 'pointer' } : {})
               }}
             >
               {col.name}
@@ -373,7 +381,8 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 {/* Date Cell (Sticky) */}
                 <div 
                   className={`${styles.cell} ${styles.dateCell}`}
-                  style={{ width: columns[0].width }}
+                  style={{ width: columns[0].width, cursor: 'pointer' }}
+                  onClick={scrollToToday}
                 >
                   {row.date}
                 </div>
