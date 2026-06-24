@@ -126,10 +126,14 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
       return;
     }
 
-    // Determine cell text from staff for fallback text rendering
-    let text = data.staff && data.staff.length > 0 ? data.staff.join(' ') : (data.text || '');
-    if (data.dayType) text += ` [${data.dayType}]`;
-    if (data.options && data.options.length > 0) text += ` (${data.options.join(', ')})`;
+    let text = '';
+    if (data.dayType === 'выходной') text = 'Выходной';
+    else if (data.dayType === 'отсыпной') text = 'Отсыпной';
+    else {
+      text = data.staff && data.staff.length > 0 ? data.staff.join(' ') : (data.text || '');
+      if (data.dayType) text += ` [${data.dayType}]`;
+      if (data.options && data.options.length > 0) text += ` (${data.options.join(', ')})`;
+    }
     
     // Determine cell color from cars
     let color = data.color || '';

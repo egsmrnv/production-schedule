@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { apiClient } from '../../api/client';
 import { CellSettingsModal } from './CellSettingsModal';
+import { type ThemeSettings, DEFAULT_THEME } from './DesignSettingsModal';
 import styles from './DataGrid.module.css';
 
 interface Column {
@@ -39,6 +40,7 @@ export interface DataGridProps {
   highlightColumnId?: string;
   staffList?: string[];
   cars?: any[];
+  themeSettings?: ThemeSettings;
 }
 
 const getDarkThemeColor = (color: string) => {
@@ -59,7 +61,8 @@ export const DataGrid: React.FC<DataGridProps> = ({
   highlightColor, 
   highlightColumnId,
   staffList = [],
-  cars = []
+  cars = [],
+  themeSettings = DEFAULT_THEME
 }) => {
   const [columns, setColumns] = useState<Column[]>([
     { id: 'date', name: 'Дата', width: 100 }
@@ -349,10 +352,13 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 const isWeekend = cellData.text === 'Выходной' || cellData.dayType === 'выходной' || cellData.text === 'Отсыпной' || cellData.dayType === 'отсыпной';
                 
                 let mappedColor = cellData.color ? getDarkThemeColor(cellData.color) : undefined;
-                if (isWeekend) {
-                  mappedColor = '#121212';
-                } else if (isWorkingShift && !mappedColor) {
-                  mappedColor = '#1c1c1e';
+                if (!mappedColor) {
+                  if (isWeekend) mappedColor = themeSettings.weekendColor;
+                  else if (cellData.dayType === 'павильон') mappedColor = themeSettings.pavilionColor;
+                  else if (cellData.dayType === 'склад') mappedColor = themeSettings.warehouseColor;
+                  else if (cellData.dayType === 'переезд') mappedColor = themeSettings.transferColor;
+                  else if (isWorkingShift) mappedColor = themeSettings.shiftColor;
+                  else mappedColor = themeSettings.emptyCellColor;
                 }
                 
                 let cellClass = styles.cell;
@@ -390,7 +396,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                     <span className={styles.cellText}>
                       {cellData.staff && cellData.staff.length > 0 ? cellData.staff.join(', ') : cellData.text}
                       {cellData.cars && cellData.cars.length > 0 && ' 🚗'}
-                      {cellData.dayType && ` [${cellData.dayType}]`}
+                      {cellData.dayType && cellData.dayType !== 'выходной' && cellData.dayType !== 'отсыпной' && ` [${cellData.dayType}]`}
                     </span>
                   </div>
                 );

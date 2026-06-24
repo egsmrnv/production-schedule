@@ -217,6 +217,33 @@ app.delete('/api/admin/cars/:id', requireAdmin, async (req, res) => {
   }
 });
 
+// --- Settings Endpoints ---
+app.get('/api/settings', async (req, res) => {
+  try {
+    const settings = await prisma.studioSetting.findMany();
+    const map = settings.reduce((acc, s) => ({...acc, [s.key]: s.value}), {});
+    res.json(map);
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.put('/api/settings', requireAdmin, async (req, res) => {
+  try {
+    const data = req.body;
+    for (const [key, value] of Object.entries(data)) {
+      await prisma.studioSetting.upsert({
+        where: { key },
+        update: { value: String(value) },
+        create: { key, value: String(value) }
+      });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // --- Staff Endpoints ---
 app.get('/api/staff/schedule', async (req, res) => {
   const { token } = req.query;

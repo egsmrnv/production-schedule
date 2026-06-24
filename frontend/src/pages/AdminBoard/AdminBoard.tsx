@@ -3,6 +3,7 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import styles from './AdminBoard.module.css';
 import { DataGrid } from '../../components/Grid/DataGrid';
+import { DesignSettingsModal, type ThemeSettings, DEFAULT_THEME } from '../../components/Grid/DesignSettingsModal';
 
 export const AdminBoard: React.FC = () => {
   const navigate = useNavigate();
@@ -12,15 +13,22 @@ export const AdminBoard: React.FC = () => {
   const [projects, setProjects] = useState<any[]>([]);
   const [cars, setCars] = useState<any[]>([]);
   const [highlight, setHighlight] = useState<{ text?: string, color?: string, columnId?: string }>({});
+  
+  const [themeSettings, setThemeSettings] = useState<ThemeSettings>(DEFAULT_THEME);
+  const [isDesignModalOpen, setIsDesignModalOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
-      const [staffRes, carsRes] = await Promise.all([
+      const [staffRes, carsRes, settingsRes] = await Promise.all([
         apiClient.get('/admin/staff'),
-        apiClient.get('/admin/cars')
+        apiClient.get('/admin/cars'),
+        apiClient.get('/settings')
       ]);
       setStaffList(staffRes.data);
       setCars(carsRes.data);
+      if (settingsRes.data && Object.keys(settingsRes.data).length > 0) {
+        setThemeSettings({ ...DEFAULT_THEME, ...settingsRes.data });
+      }
     } catch (e) {
       console.error(e);
     }
@@ -86,6 +94,17 @@ export const AdminBoard: React.FC = () => {
     window.location.reload();
   };
 
+  const handleSaveDesign = async (newSettings: ThemeSettings) => {
+    try {
+      await apiClient.put('/settings', newSettings);
+      setThemeSettings(newSettings);
+      setIsDesignModalOpen(false);
+    } catch (error) {
+      console.error(error);
+      alert('Ошибка при сохранении настроек');
+    }
+  };
+
   return (
     <div className={styles.container}>
       <header className={styles.header}>
@@ -101,6 +120,7 @@ export const AdminBoard: React.FC = () => {
             highlightColumnId={highlight.columnId}
             staffList={staffList.map(s => s.name)}
             cars={cars}
+            themeSettings={themeSettings}
           />
         </section>
         <aside className={styles.sidebar}>
@@ -171,8 +191,24 @@ export const AdminBoard: React.FC = () => {
               ))}
             </ul>
           </div>
+          
+          <div className={styles.sidebarSection} style={{ marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '15px' }}>
+            <button 
+              onClick={() => setIsDesignModalOpen(true)}
+              style={{ width: '100%', padding: '10px', backgroundColor: 'var(--cell-bg)', border: '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)', cursor: 'pointer' }}
+            >
+              🎨 Настройки дизайна
+            </button>
+          </div>
         </aside>
       </div>
+      
+      <DesignSettingsModal 
+        isOpen={isDesignModalOpen} 
+        onClose={() => setIsDesignModalOpen(false)}
+        initialSettings={themeSettings}
+        onSave={handleSaveDesign}
+      />
     </div>
   );
 };
