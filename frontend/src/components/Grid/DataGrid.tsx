@@ -33,6 +33,15 @@ interface Selection {
   endCol: number;
 }
 
+const MONTH_NAMES = [
+  'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 
+  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
+];
+
+type GridItem = 
+  | { type: 'month-header'; monthKey: string; label: string; isCollapsed: boolean }
+  | { type: 'row'; row: Row; originalIndex: number };
+
 export interface DataGridProps {
   onDataLoaded?: (columns: Column[], rows: Row[]) => void;
   highlightText?: string;
@@ -92,6 +101,44 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const [activeCell, setActiveCell] = useState<{rowIndex: number, colIndex: number} | null>(null);
+  const [collapsedMonths, setCollapsedMonths] = useState<Record<string, boolean>>({});
+
+  const todayStrForCalc = React.useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }, []);
+
+  const gridItems = React.useMemo(() => {
+    const items: GridItem[] = [];
+    let currentMonth = '';
+
+    rows.forEach((row, idx) => {
+      const monthKey = row.rawDate.substring(0, 7);
+      if (monthKey !== currentMonth) {
+         currentMonth = monthKey;
+         const isPast = monthKey < todayStrForCalc;
+         const isCollapsed = collapsedMonths[monthKey] !== undefined ? collapsedMonths[monthKey] : isPast;
+         
+         const [y, m] = monthKey.split('-');
+         const label = `${MONTH_NAMES[parseInt(m, 10) - 1]} ${y}`;
+         items.push({ type: 'month-header', monthKey, label, isCollapsed });
+      }
+      
+      const isCollapsed = collapsedMonths[monthKey] !== undefined ? collapsedMonths[monthKey] : (monthKey < todayStrForCalc);
+      if (!isCollapsed) {
+         items.push({ type: 'row', row, originalIndex: idx });
+      }
+    });
+    return items;
+  }, [rows, collapsedMonths, todayStrForCalc]);
+
+  const toggleMonth = (monthKey: string) => {
+    setCollapsedMonths(prev => {
+      const isPast = monthKey < todayStrForCalc;
+      const currentlyCollapsed = prev[monthKey] !== undefined ? prev[monthKey] : isPast;
+      return { ...prev, [monthKey]: !currentlyCollapsed };
+    });
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -144,7 +191,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const [isDragging, setIsDragging] = useState(false);
 
   const rowVirtualizer = useVirtualizer({
-    count: rows.length,
+    count: gridItems.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 40,
     overscan: 10,
@@ -205,10 +252,13 @@ export const DataGrid: React.FC<DataGridProps> = ({
       let plainText = '';
 
       for (let r = minRow; r <= maxRow; r++) {
+        const item = gridItems[r];
+        if (item.type === 'month-header') continue;
+        const originalIndex = item.originalIndex;
         const rowData = [];
         for (let c = minCol; c <= maxCol; c++) {
           const colId = columns[c].id;
-          const cell = rows[r].data[colId] || { text: '', color: '' };
+          const cell = rows[originalIndex].data[colId] || { text: '', color: '' };
           rowData.push(cell);
           plainText += cell.text + (c < maxCol ? '\t' : '');
         }
@@ -244,11 +294,13 @@ export const DataGrid: React.FC<DataGridProps> = ({
     const newRows = [...rows];
 
     if (pastedJson && Array.isArray(pastedJson)) {
-      for (let r = 0; r < pastedJson.length; r++) {
-        const targetRow = minRow + r;
-        if (targetRow >= newRows.length) break;
+      let pastedRowIdx = 0;
+      for (let r = minRow; r < gridItems.length && pastedRowIdx < pastedJson.length; r++) {
+        const item = gridItems[r];
+        if (item.type === 'month-header') continue;
+        const targetRow = item.originalIndex;
 
-        for (let c = 0; c < pastedJson[r].length; c++) {
+        for (let c = 0; c < pastedJson[pastedRowIdx].length; c++) {
           const targetCol = minCol + c;
           if (targetCol >= columns.length) break;
 
@@ -258,12 +310,13 @@ export const DataGrid: React.FC<DataGridProps> = ({
             data: {
               ...newRows[targetRow].data,
               [colId]: {
-                text: pastedJson[r][c].text || '',
-                color: pastedJson[r][c].color || ''
+                text: pastedJson[pastedRowIdx][c].text || '',
+                color: pastedJson[pastedRowIdx][c].color || ''
               }
             }
           };
         }
+        pastedRowIdx++;
       }
       setRows(newRows);
       
@@ -271,7 +324,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
       setSelection({
         startRow: minRow,
         startCol: minCol,
-        endRow: Math.min(minRow + pastedJson.length - 1, newRows.length - 1),
+        endRow: Math.min(minRow + pastedJson.length - 1, gridItems.length - 1),
         endCol: Math.min(minCol + pastedJson[0].length - 1, columns.length - 1)
       });
     } else {
@@ -280,11 +333,15 @@ export const DataGrid: React.FC<DataGridProps> = ({
       if (!text) return;
       
       const textRows = text.split('\n');
-      for (let r = 0; r < textRows.length; r++) {
-        const targetRow = minRow + r;
-        if (targetRow >= newRows.length) break;
+      let pastedRowIdx = 0;
+      for (let r = minRow; r < gridItems.length && pastedRowIdx < textRows.length; r++) {
+        const item = gridItems[r];
+        if (item.type === 'month-header') continue;
+        const targetRow = item.originalIndex;
 
-        const cells = textRows[r].split('\t');
+        const cells = textRows[pastedRowIdx].split('\t');
+        pastedRowIdx++;
+        
         for (let c = 0; c < cells.length; c++) {
           const targetCol = minCol + c;
           if (targetCol >= columns.length) break;
@@ -306,7 +363,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
       }
       setRows(newRows);
     }
-  }, [selection, rows, columns]);
+  }, [selection, rows, columns, gridItems]);
 
   useEffect(() => {
     document.addEventListener('paste', handlePaste);
@@ -320,7 +377,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   const scrollToToday = () => {
-    const todayIndex = rows.findIndex(r => r.rawDate === todayStr);
+    const todayIndex = gridItems.findIndex(item => item.type === 'row' && item.row.rawDate === todayStr);
     if (todayIndex !== -1) {
       rowVirtualizer.scrollToIndex(todayIndex, { align: 'center' });
     }
@@ -365,7 +422,28 @@ export const DataGrid: React.FC<DataGridProps> = ({
         )}
         {/* Virtualized Rows */}
         {rowVirtualizer.getVirtualItems().map(virtualRow => {
-          const row = rows[virtualRow.index];
+          const item = gridItems[virtualRow.index];
+          
+          if (item.type === 'month-header') {
+            return (
+              <div 
+                key={virtualRow.index}
+                className={styles.monthHeaderRow}
+                style={{
+                  top: `${virtualRow.start + 40}px`,
+                  height: `${virtualRow.size}px`,
+                  width: `${totalWidth}px`
+                }}
+                onClick={() => toggleMonth(item.monthKey)}
+              >
+                <div className={styles.monthHeaderContent}>
+                  <span className={styles.monthHeaderToggle}>{item.isCollapsed ? '▶' : '▼'}</span> {item.label}
+                </div>
+              </div>
+            );
+          }
+
+          const row = item.row;
             return (
               <div 
                 key={virtualRow.index}
@@ -459,17 +537,19 @@ export const DataGrid: React.FC<DataGridProps> = ({
       </div>
 
       {/* Cell Settings Modal */}
-      {activeCell && (
+      {activeCell && gridItems[activeCell.rowIndex] && gridItems[activeCell.rowIndex].type === 'row' && (
         <CellSettingsModal
           isOpen={true}
           onClose={() => setActiveCell(null)}
           staffList={staffList}
           cars={cars}
-          date={rows[activeCell.rowIndex].date}
+          date={(gridItems[activeCell.rowIndex] as any).row.date}
           columnName={columns[activeCell.colIndex].name}
-          initialData={rows[activeCell.rowIndex].data[columns[activeCell.colIndex].id] || {}}
+          initialData={(gridItems[activeCell.rowIndex] as any).row.data[columns[activeCell.colIndex].id] || {}}
           onSave={async (newData) => {
-            const row = rows[activeCell.rowIndex];
+            const item = gridItems[activeCell.rowIndex];
+            if (item.type !== 'row') return;
+            const row = item.row;
             const col = columns[activeCell.colIndex];
             
             const isoDate = row.rawDate;
@@ -491,7 +571,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
               
               // Update local state
               const newRows = [...rows];
-              newRows[activeCell.rowIndex] = { ...row, data: fullData };
+              newRows[item.originalIndex] = { ...row, data: fullData };
               setRows(newRows);
               setActiveCell(null);
             } catch (err) {

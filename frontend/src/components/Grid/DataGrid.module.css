@@ -119,3 +119,35 @@
   pointer-events: none;
   z-index: 15;
 }
+
+.monthHeaderRow {
+  position: absolute;
+  left: 0;
+  display: flex;
+  background-color: var(--panel-bg);
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  z-index: 19;
+}
+
+.monthHeaderRow:hover {
+  filter: brightness(1.1);
+}
+
+.monthHeaderContent {
+  position: sticky;
+  left: 0;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  height: 100%;
+}
+
+.monthHeaderToggle {
+  margin-right: 8px;
+  font-size: 10px;
+  color: var(--text-secondary);
+}
