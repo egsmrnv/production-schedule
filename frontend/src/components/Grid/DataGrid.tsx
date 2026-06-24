@@ -341,8 +341,19 @@ export const DataGrid: React.FC<DataGridProps> = ({
 
   const handleMouseDown = (rowIdx: number, colIdx: number) => {
     if (colIdx === 0) return;
-    setSelection({ startRow: rowIdx, startCol: colIdx, endRow: rowIdx, endCol: colIdx });
-    setIsDragging(true);
+    
+    const isAlreadySelected = selection &&
+      selection.startRow === rowIdx && selection.endRow === rowIdx &&
+      selection.startCol === colIdx && selection.endCol === colIdx;
+
+    if (isAlreadySelected) {
+      // Second click on the same cell: open settings modal
+      setActiveCell({ rowIndex: rowIdx, colIndex: colIdx });
+    } else {
+      // First click: select the cell
+      setSelection({ startRow: rowIdx, startCol: colIdx, endRow: rowIdx, endCol: colIdx });
+      setIsDragging(true);
+    }
   };
 
   const handleMouseEnter = (rowIdx: number, colIdx: number) => {
@@ -370,7 +381,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
       if (item.type === 'month-header') continue;
       const rowData: any[] = [];
       for (let c = minCol; c <= maxCol; c++) {
-        const cell = rows[item.originalIndex].data[columns[c].id] || { text: '', color: '' };
+        const cell = rows[item.originalIndex].data[columns[c].id] || {};
         rowData.push(cell);
         plainText += cell.text + (c < maxCol ? '\t' : '');
       }
@@ -408,11 +419,24 @@ export const DataGrid: React.FC<DataGridProps> = ({
           const targetCol = minCol + c;
           if (targetCol >= columns.length) break;
           const colId = columns[targetCol].id;
+          
+          // Cannot paste into an area without an active project
+          const activeProject = activeProjectsContext[colId]?.[item.originalIndex];
+          if (!activeProject) continue;
+
+          const pastedCell = { ...pastedJson[pasteRowIdx][c] };
+
+          // Sanitize project_start when pasting into an existing project
+          if (pastedCell.cellType === 'project_start') {
+            pastedCell.cellType = 'shift';
+            delete pastedCell.projectName;
+          }
+
           newRows[item.originalIndex] = {
             ...newRows[item.originalIndex],
             data: {
               ...newRows[item.originalIndex].data,
-              [colId]: { text: pastedJson[pasteRowIdx][c].text || '', color: pastedJson[pasteRowIdx][c].color || '' },
+              [colId]: { ...pastedCell, text: pastedCell.text || '', color: pastedCell.color || '' },
             },
           };
         }
@@ -641,14 +665,10 @@ export const DataGrid: React.FC<DataGridProps> = ({
                   <div
                     key={col.id}
                     className={cellClass}
-                    style={{ width: col.width, backgroundColor: selected ? undefined : mappedColor, color: textColor, position: 'relative' }}
+                    style={{ width: col.width, backgroundColor: mappedColor, color: textColor, position: 'relative' }}
                     onMouseDown={() => handleMouseDown(virtualRow.index, actualColIndex)}
                     onMouseEnter={() => handleMouseEnter(virtualRow.index, actualColIndex)}
-                    onClick={() => setActiveCell({ rowIndex: virtualRow.index, colIndex: actualColIndex })}
                   >
-                    {selected && mappedColor && (
-                      <div className={styles.selectionOverlay} style={{ backgroundColor: mappedColor }} />
-                    )}
                     {isCellInProject && (
                       <div style={{
                         position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1, borderRadius: '4px',
