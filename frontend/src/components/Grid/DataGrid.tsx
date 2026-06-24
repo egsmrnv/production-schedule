@@ -32,6 +32,7 @@ export const DataGrid: React.FC = () => {
   ]);
 
   const [rows, setRows] = useState<Row[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -61,8 +62,14 @@ export const DataGrid: React.FC = () => {
 
         setColumns(newColumns);
         setRows(newRows);
-      } catch (err) {
+        setError(null);
+      } catch (err: any) {
         console.error('Failed to load schedule', err);
+        if (err.response?.status === 401) {
+          setError('Необходима авторизация. Пожалуйста, войдите в систему.');
+        } else {
+          setError('Не удалось загрузить данные. Проверьте, запущен ли бэкенд.');
+        }
       }
     };
     loadData();
@@ -264,6 +271,12 @@ export const DataGrid: React.FC = () => {
             </div>
           ))}
         </div>
+
+        {error && (
+          <div style={{ padding: '20px', color: 'var(--danger-color)' }}>
+            {error}
+          </div>
+        )}
 
         {/* Virtualized Rows */}
         {rowVirtualizer.getVirtualItems().map(virtualRow => {

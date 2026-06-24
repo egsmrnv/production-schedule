@@ -1,10 +1,15 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import styles from './AdminBoard.module.css';
 import { DataGrid } from '../../components/Grid/DataGrid';
 
 export const AdminBoard: React.FC = () => {
   const navigate = useNavigate();
+  const token = localStorage.getItem('token');
+
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
 
   const handleLogout = () => {
     localStorage.removeItem('token');
