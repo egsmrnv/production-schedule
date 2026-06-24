@@ -16,6 +16,11 @@ export const AdminBoard: React.FC = () => {
   
   const [themeSettings, setThemeSettings] = useState<ThemeSettings>(DEFAULT_THEME);
   const [isDesignModalOpen, setIsDesignModalOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState({ cars: false, projects: false, staff: false });
+
+  const toggleCollapse = (key: 'cars' | 'projects' | 'staff') => {
+    setCollapsed(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const fetchData = useCallback(async () => {
     try {
@@ -136,60 +141,66 @@ export const AdminBoard: React.FC = () => {
           )}
           
           <div className={styles.sidebarSection}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3>Машины</h3>
-              <button onClick={handleAddCar} style={{ fontSize: '16px', color: 'var(--primary-color)' }}>➕</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => toggleCollapse('cars')}>
+              <h3 style={{ margin: 0 }}>Машины {collapsed.cars ? '▼' : '▲'}</h3>
+              <button onClick={(e) => { e.stopPropagation(); handleAddCar(); }} style={{ fontSize: '16px', color: 'var(--primary-color)' }}>➕</button>
             </div>
-            <ul className={styles.legendList}>
-              {cars.map(c => (
-                <li 
-                  key={c.id}
-                  style={{ cursor: 'pointer', opacity: highlight.color === c.color ? 1 : 0.7 }}
-                  onClick={() => setHighlight({ color: c.color })}
-                >
-                  <span style={{flex: 1}}>{c.label}</span>
-                  <button onClick={(e) => handleDeleteCar(c.id, e)} style={{ color: 'var(--danger-color)', padding: '0 5px' }}>🗑</button>
-                </li>
-              ))}
-            </ul>
+            {!collapsed.cars && (
+              <ul className={styles.legendList} style={{ marginTop: '10px' }}>
+                {cars.map(c => (
+                  <li 
+                    key={c.id}
+                    style={{ cursor: 'pointer', opacity: highlight.color === c.color ? 1 : 0.7 }}
+                    onClick={() => setHighlight({ color: c.color })}
+                  >
+                    <span style={{flex: 1}}>{c.label}</span>
+                    <button onClick={(e) => handleDeleteCar(c.id, e)} style={{ color: 'var(--danger-color)', padding: '0 5px' }}>🗑</button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className={styles.sidebarSection}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3>Проекты</h3>
-              <button onClick={handleAddProject} style={{ fontSize: '16px', color: 'var(--primary-color)' }}>➕</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => toggleCollapse('projects')}>
+              <h3 style={{ margin: 0 }}>Проекты {collapsed.projects ? '▼' : '▲'}</h3>
+              <button onClick={(e) => { e.stopPropagation(); handleAddProject(); }} style={{ fontSize: '16px', color: 'var(--primary-color)' }}>➕</button>
             </div>
-            <ul className={styles.legendList}>
-              {projects.map(p => (
-                <li 
-                  key={p.id} 
-                  style={{ cursor: 'pointer', opacity: highlight.columnId === p.id ? 1 : 0.7 }}
-                  onClick={() => setHighlight({ columnId: p.id })}
-                >
-                  <span style={{flex: 1}}>{p.name}</span>
-                  <button onClick={(e) => handleDeleteProject(p.id, e)} style={{ color: 'var(--danger-color)', padding: '0 5px' }}>🗑</button>
-                </li>
-              ))}
-            </ul>
+            {!collapsed.projects && (
+              <ul className={styles.legendList} style={{ marginTop: '10px' }}>
+                {projects.map(p => (
+                  <li 
+                    key={p.id} 
+                    style={{ cursor: 'pointer', opacity: highlight.columnId === p.id ? 1 : 0.7 }}
+                    onClick={() => setHighlight({ columnId: p.id })}
+                  >
+                    <span style={{flex: 1}}>{p.name}</span>
+                    <button onClick={(e) => handleDeleteProject(p.id, e)} style={{ color: 'var(--danger-color)', padding: '0 5px' }}>🗑</button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className={styles.sidebarSection}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3>Сотрудники</h3>
-              <button onClick={handleAddStaff} style={{ fontSize: '16px', color: 'var(--primary-color)' }}>➕</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => toggleCollapse('staff')}>
+              <h3 style={{ margin: 0 }}>Сотрудники {collapsed.staff ? '▼' : '▲'}</h3>
+              <button onClick={(e) => { e.stopPropagation(); handleAddStaff(); }} style={{ fontSize: '16px', color: 'var(--primary-color)' }}>➕</button>
             </div>
-            <ul className={styles.staffList}>
-              {staffList.map(s => (
-                <li 
-                  key={s.id}
-                  style={{ cursor: 'pointer', backgroundColor: highlight.text === s.name ? 'var(--cell-selected)' : 'transparent' }}
-                  onClick={() => setHighlight({ text: s.name })}
-                >
-                  <span style={{flex: 1}}>{s.name}</span>
-                  <button onClick={(e) => handleDeleteStaff(s.id, e)} style={{ color: 'var(--danger-color)', padding: '0 5px' }}>🗑</button>
-                </li>
-              ))}
-            </ul>
+            {!collapsed.staff && (
+              <ul className={styles.staffList} style={{ marginTop: '10px' }}>
+                {staffList.map(s => (
+                  <li 
+                    key={s.id}
+                    style={{ cursor: 'pointer', backgroundColor: highlight.text === s.name ? 'var(--cell-selected)' : 'transparent' }}
+                    onClick={() => setHighlight({ text: s.name })}
+                  >
+                    <span style={{flex: 1}}>{s.name}</span>
+                    <button onClick={(e) => handleDeleteStaff(s.id, e)} style={{ color: 'var(--danger-color)', padding: '0 5px' }}>🗑</button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           
           <div className={styles.sidebarSection} style={{ marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '15px' }}>

@@ -9,6 +9,7 @@ export interface ThemeSettings {
   warehouseColor: string;
   transferColor: string;
   stopColor: string;
+  hoverGlowColor: string;
 }
 
 export const DEFAULT_THEME: ThemeSettings = {
@@ -18,7 +19,8 @@ export const DEFAULT_THEME: ThemeSettings = {
   pavilionColor: '#2d1b4e',
   warehouseColor: '#3c2b1e',
   transferColor: '#1e3c3c',
-  stopColor: '#660000'
+  stopColor: '#660000',
+  hoverGlowColor: '#0a84ff'
 };
 
 export const DesignSettingsModal = ({ isOpen, onClose, onSave, initialSettings }: any) => {
@@ -71,6 +73,10 @@ export const DesignSettingsModal = ({ isOpen, onClose, onSave, initialSettings }
           <div className={styles.field}>
             <label>СТОП</label>
             <input type="color" value={settings.stopColor} onChange={e => handleChange('stopColor', e.target.value)} />
+          </div>
+          <div className={styles.field}>
+            <label>Цвет свечения (Hover)</label>
+            <input type="color" value={settings.hoverGlowColor || '#0a84ff'} onChange={e => handleChange('hoverGlowColor', e.target.value)} />
           </div>
         </div>
         <div className={styles.footer}>

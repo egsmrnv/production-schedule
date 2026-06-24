@@ -69,6 +69,14 @@ const getContrastYIQ = (hexcolor: string) => {
   return (yiq >= 128) ? '#000000' : '#ffffff';
 };
 
+const hexToRgbString = (hex: string) => {
+  if (!hex) return '10, 132, 255';
+  let c = hex.replace('#', '');
+  if (c.length === 3) c = c.split('').map(x => x + x).join('');
+  if (c.length !== 6) return '10, 132, 255';
+  return `${parseInt(c.substr(0,2),16)}, ${parseInt(c.substr(2,2),16)}, ${parseInt(c.substr(4,2),16)}`;
+};
+
 export const DataGrid: React.FC<DataGridProps> = ({  
   onDataLoaded, 
   highlightText, 
@@ -315,6 +323,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
       ref={parentRef}
       onKeyDown={handleKeyDown}
       tabIndex={0}
+      style={{ '--glow-rgb': hexToRgbString(themeSettings.hoverGlowColor) } as any}
     >
       <div 
         className={styles.gridInner} 
