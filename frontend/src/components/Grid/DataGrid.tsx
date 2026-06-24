@@ -33,7 +33,19 @@ export interface DataGridProps {
   highlightColumnId?: string;
 }
 
-export const DataGrid: React.FC<DataGridProps> = ({ 
+const getDarkThemeColor = (color: string) => {
+  const c = color.toLowerCase();
+  if (c === '#cccccc') return '#3a3a3c'; // Grey
+  if (c === '#b6d7a8') return '#1e4620'; // Deep Green
+  if (c === '#fff2cc') return '#5c4008'; // Deep Yellow
+  if (c === '#efefef') return '#2c2c2e'; // Light Grey -> Darker Grey
+  if (c === '#f4cccc') return '#5c1e1e'; // Deep Red
+  if (c === '#fce5cd') return '#593214'; // Deep Orange
+  if (c === '#000000') return '#1c1c1e'; // Black
+  return color;
+};
+
+export const DataGrid: React.FC<DataGridProps> = ({  
   onDataLoaded, 
   highlightText, 
   highlightColor, 
@@ -318,6 +330,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 const actualColIndex = colIndex + 1;
                 const cellData = row.data[col.id] || { text: '', color: '' };
                 const selected = isCellSelected(virtualRow.index, actualColIndex);
+                const mappedColor = cellData.color ? getDarkThemeColor(cellData.color) : undefined;
                 
                 let cellClass = styles.cell;
                 if (selected) cellClass += ` ${styles.selected}`;
@@ -341,14 +354,14 @@ export const DataGrid: React.FC<DataGridProps> = ({
                     className={cellClass}
                     style={{ 
                       width: col.width,
-                      backgroundColor: selected ? undefined : (cellData.color || undefined) 
+                      backgroundColor: selected ? undefined : mappedColor 
                     }}
                     onMouseDown={() => handleMouseDown(virtualRow.index, actualColIndex)}
                     onMouseEnter={() => handleMouseEnter(virtualRow.index, actualColIndex)}
                   >
                     {/* Add a translucent background over custom color if selected */}
-                    {selected && cellData.color && (
-                      <div className={styles.selectionOverlay} style={{ backgroundColor: cellData.color }}></div>
+                    {selected && mappedColor && (
+                      <div className={styles.selectionOverlay} style={{ backgroundColor: mappedColor }}></div>
                     )}
                     <span className={styles.cellText}>{cellData.text}</span>
                   </div>

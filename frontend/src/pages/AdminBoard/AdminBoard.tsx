@@ -30,14 +30,22 @@ export const AdminBoard: React.FC = () => {
 
     // Extract Staff
     const staffSet = new Set<string>();
-    const exclude = ['Выходной', 'СТОП', 'Нет', 'ОТМЕНА', 'СМЕНЫ', 'СВОИ'];
+    const exclude = ['Выходной', 'СТОП', 'Нет', 'ОТМЕНА', 'СМЕНЫ', 'СВОИ', 'ЛИЦЕМЕРЫ', 'Фестиваль'];
     rows.forEach(r => {
       Object.values(r.data).forEach((cell: any) => {
         if (cell.text) {
-          const words = cell.text.split(/[\s/()]+/);
+          const words = cell.text.split(/[\s/(),[\]]+/);
           words.forEach((w: string) => {
-            if (w.length > 2 && !exclude.includes(w)) {
-              staffSet.add(w);
+            // Remove emojis, numbers and punctuation
+            const cleanWord = w.replace(/[^\p{L}]/gu, '');
+            // Must be at least 3 chars, start with uppercase, and not in exclude list
+            if (
+              cleanWord.length > 2 && 
+              cleanWord[0] === cleanWord[0].toUpperCase() && 
+              cleanWord[0] !== cleanWord[0].toLowerCase() && 
+              !exclude.includes(cleanWord)
+            ) {
+              staffSet.add(cleanWord);
             }
           });
         }
