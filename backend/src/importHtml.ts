@@ -32,6 +32,7 @@ async function main() {
   
   let columns: { id: string, name: string, index: number }[] = [];
   let isParsingData = false;
+  const upserts: any[] = [];
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -112,13 +113,19 @@ async function main() {
         }
       }
 
-      await prisma.scheduleDate.upsert({
-        where: { date: isoDate },
-        update: { data: dataObj },
-        create: { date: isoDate, data: dataObj },
-      });
-      console.log(`Imported ${isoDate}`);
+      upserts.push(
+        prisma.scheduleDate.upsert({
+          where: { date: isoDate },
+          update: { data: dataObj },
+          create: { date: isoDate, data: dataObj },
+        })
+      );
     }
+  }
+
+  if (upserts.length > 0) {
+    console.log(`Executing ${upserts.length} upserts in transaction...`);
+    await prisma.$transaction(upserts);
   }
 
   console.log('Import completed.');

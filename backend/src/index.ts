@@ -16,7 +16,6 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:2626';
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is missing.');
 }
-const JWT_SECRET = process.env.JWT_SECRET;
 
 app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.json());
