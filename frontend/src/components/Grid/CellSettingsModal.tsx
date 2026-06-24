@@ -23,27 +23,56 @@ interface CellSettingsModalProps {
 export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
   isOpen, onClose, onSave, initialData, date, columnName, staffList
 }) => {
-  const [data, setData] = useState<StructuredData>({});
-  
-  useEffect(() => {
-    if (isOpen) {
-      setData({
-        staff: [], cars: [], dayType: '', options: [],
-        ...initialData
-      });
-    }
-  }, [isOpen, initialData]);
-
-  if (!isOpen) return null;
-
   const carsOptions = [
     { id: 'white', label: '⬛️/⚫️ Белый спринтер/крафтер', color: '#cccccc' },
     { id: 'green', label: '🟢 Зеленый спринтер', color: '#b6d7a8' },
     { id: 'orange', label: '🟠 Оранжевый', color: '#fce5cd' },
   ];
 
-  const dayTypeOptions = ['натура', 'павильон склад', 'переезд'];
+  const dayTypeOptions = ['натура', 'павильон', 'склад', 'переезд'];
   const extraOptions = ['погрузка', 'разгрузка'];
+
+  const [data, setData] = useState<StructuredData>({});
+  
+  useEffect(() => {
+    if (isOpen) {
+      let parsedStaff = initialData.staff || [];
+      // Auto-extract from legacy text if not present
+      if (!initialData.staff && initialData.text) {
+        const exclude = ['Выходной', 'СТОП', 'Нет', 'ОТМЕНА', 'СМЕНЫ', 'СВОИ', 'ЛИЦЕМЕРЫ', 'Фестиваль'];
+        const words = initialData.text.split(/[\s/(),[\]]+/);
+        const foundStaff = new Set<string>();
+        words.forEach((w: string) => {
+          const cleanWord = w.replace(/[^\p{L}]/gu, '');
+          if (
+            cleanWord.length > 2 && 
+            cleanWord[0] === cleanWord[0].toUpperCase() && 
+            cleanWord[0] !== cleanWord[0].toLowerCase() && 
+            !exclude.includes(cleanWord)
+          ) {
+            foundStaff.add(cleanWord);
+          }
+        });
+        parsedStaff = Array.from(foundStaff);
+      }
+
+      let parsedCars = initialData.cars || [];
+      if (!initialData.cars && initialData.color) {
+        const matchedCar = carsOptions.find(c => c.color.toLowerCase() === initialData.color?.toLowerCase());
+        if (matchedCar) parsedCars = [matchedCar.label];
+      }
+
+      setData({
+        ...initialData,
+        staff: parsedStaff,
+        cars: parsedCars,
+        dayType: initialData.dayType || '',
+        options: initialData.options || []
+      });
+    }
+  }, [isOpen, initialData]);
+
+  if (!isOpen) return null;
 
   const handleAddStaff = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
@@ -77,6 +106,19 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
   };
 
   const handleSave = () => {
+    // Check if changes made
+    const hasChanged = 
+      JSON.stringify(data.staff) !== JSON.stringify(initialData.staff) ||
+      JSON.stringify(data.cars) !== JSON.stringify(initialData.cars) ||
+      data.dayType !== (initialData.dayType || '') ||
+      JSON.stringify(data.options) !== JSON.stringify(initialData.options || []);
+
+    if (!hasChanged && initialData.staff !== undefined) {
+      // Nothing changed, and it's not a legacy conversion
+      onClose();
+      return;
+    }
+
     // Determine cell text from staff for fallback text rendering
     let text = data.staff && data.staff.length > 0 ? data.staff.join(' ') : (data.text || '');
     if (data.dayType) text += ` [${data.dayType}]`;
