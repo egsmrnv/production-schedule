@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { apiClient } from '../../api/client';
-import { CellSettingsModal } from './CellSettingsModal';
+import { CellSettingsModal, type StructuredData } from './CellSettingsModal';
 import { type ThemeSettings, DEFAULT_THEME } from './DesignSettingsModal';
 import styles from './DataGrid.module.css';
 
@@ -643,7 +643,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                     {isCellInProject && (
                       <div style={{
                         position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1, borderRadius: '4px',
-                        boxShadow: `inset 0 0 16px ${activeProjectForCell!.color}${isWeekend ? '0D' : '1A'}`,
+                        boxShadow: `inset 0 0 16px ${activeProjectForCell!.color}${isWeekend ? '1A' : '26'}`,
                       }} />
                     )}
                     <span className={styles.cellText} style={{ zIndex: 2 }}>
@@ -677,7 +677,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
             cars={cars}
             date={item.row.date}
             columnName={col.name}
-            initialData={item.row.data[col.id] || {}}
+            initialData={(item.row.data[col.id] as StructuredData) || {}}
             activeProject={activeProjectsContext[col.id]?.[item.originalIndex] ?? null}
             onSave={async (newData) => {
               const row = item.row;

@@ -17,7 +17,6 @@ export const ColumnSettingsModal: React.FC<ColumnSettingsModalProps> = ({ isOpen
   const [localColumns, setLocalColumns] = useState<Column[]>(columns);
   const [deletedIds, setDeletedIds] = useState<string[]>([]);
   const [addedColumns, setAddedColumns] = useState<{name: string, order: number}[]>([]);
-  const [newColName, setNewColName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   if (!isOpen) return null;
