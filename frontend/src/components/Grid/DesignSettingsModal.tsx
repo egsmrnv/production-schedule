@@ -74,6 +74,8 @@ export const DesignSettingsModal = ({ isOpen, onClose, onSave, initialSettings }
           </div>
         </div>
         <div className={styles.footer}>
+          <button className={styles.cancelBtn} onClick={() => setSettings(DEFAULT_THEME)}>Сброс</button>
+          <div style={{ flex: 1 }}></div>
           <button className={styles.cancelBtn} onClick={onClose}>Отмена</button>
           <button className={styles.saveBtn} onClick={() => onSave(settings)}>Сохранить</button>
         </div>

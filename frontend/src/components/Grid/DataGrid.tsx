@@ -44,15 +44,29 @@ export interface DataGridProps {
 }
 
 const getDarkThemeColor = (color: string) => {
-  const c = color.toLowerCase();
-  if (c === '#cccccc') return '#161618'; // Extremely dark grey for weekends
-  if (c === '#b6d7a8') return '#1e4620'; // Deep Green
-  if (c === '#fff2cc') return '#5c4008'; // Deep Yellow
-  if (c === '#efefef') return '#2c2c2e'; // Light Grey -> Darker Grey
-  if (c === '#f4cccc') return '#5c1e1e'; // Deep Red
-  if (c === '#fce5cd') return '#593214'; // Deep Orange
-  if (c === '#000000') return '#1c1c1e'; // Black
-  return color;
+  const lower = color.toLowerCase();
+  if (lower === '#cccccc') return '#161618'; // Extremely dark grey for weekends
+  if (lower === '#b6d7a8') return '#1e4620'; // Deep Green
+  if (lower === '#fff2cc') return '#5c4008'; // Deep Yellow
+  if (lower === '#efefef') return '#2c2c2e'; // Light Grey -> Darker Grey
+  if (lower === '#f4cccc') return '#5c1e1e'; // Deep Red
+  if (lower === '#ffe599' || lower === '#ffd966') return '#7f6000'; // Желтый (павильон)
+  if (lower === '#e06666' || lower === '#cc0000') return '#660000'; // Красный (стоп)
+  return undefined;
+};
+
+const getContrastYIQ = (hexcolor: string) => {
+  if (!hexcolor) return undefined;
+  hexcolor = hexcolor.replace('#', '');
+  if (hexcolor.length === 3) {
+    hexcolor = hexcolor.split('').map(c => c + c).join('');
+  }
+  if (hexcolor.length !== 6) return undefined;
+  const r = parseInt(hexcolor.substr(0,2),16);
+  const g = parseInt(hexcolor.substr(2,2),16);
+  const b = parseInt(hexcolor.substr(4,2),16);
+  const yiq = ((r*299)+(g*587)+(b*114))/1000;
+  return (yiq >= 128) ? '#000000' : '#ffffff';
 };
 
 export const DataGrid: React.FC<DataGridProps> = ({  
@@ -380,13 +394,16 @@ export const DataGrid: React.FC<DataGridProps> = ({
                   else cellClass += ` ${styles.dimmed}`;
                 }
 
+                const textColor = selected ? undefined : (mappedColor ? getContrastYIQ(mappedColor) : undefined);
+
                 return (
                   <div 
                     key={col.id}
                     className={cellClass}
                     style={{ 
                       width: col.width,
-                      backgroundColor: selected ? undefined : mappedColor 
+                      backgroundColor: selected ? undefined : mappedColor,
+                      color: textColor
                     }}
                     onMouseDown={() => handleMouseDown(virtualRow.index, actualColIndex)}
                     onMouseEnter={() => handleMouseEnter(virtualRow.index, actualColIndex)}
