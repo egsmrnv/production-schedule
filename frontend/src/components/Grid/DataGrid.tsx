@@ -112,17 +112,17 @@ export const DataGrid: React.FC<DataGridProps> = ({
   }, []);
 
   const activeProjectsContext = React.useMemo(() => {
-    const context: Record<string, (string | null)[]> = {};
+    const context: Record<string, ({ name: string, color: string } | null)[]> = {};
     columns.forEach(c => {
       if (c.id === 'date') return;
       context[c.id] = new Array(rows.length).fill(null);
-      let activeProj: string | null = null;
+      let activeProj: { name: string, color: string } | null = null;
       rows.forEach((row, i) => {
         context[c.id][i] = activeProj;
         const cell = row.data[c.id];
         if (cell) {
           if (cell.cellType === 'project_start' || (cell.projectName && !cell.cellType) || (cell.text && !activeProj && !cell.staff?.length && !cell.cars?.length && cell.text !== 'Выходной' && cell.text !== 'Отсыпной' && cell.text !== 'СТОП')) {
-             activeProj = cell.projectName || cell.text || 'Новый проект';
+             activeProj = { name: cell.projectName || cell.text || 'Новый проект', color: cell.color || 'var(--primary-color)' };
           } else if (cell.cellType === 'stop' || cell.dayType === 'стоп' || cell.text === 'СТОП') {
              activeProj = null;
           }
@@ -485,11 +485,12 @@ export const DataGrid: React.FC<DataGridProps> = ({
                   }}
                 >
                   {activeProjForHeader && (
-                     <div style={{ position: 'absolute', inset: 0, backgroundColor: 'var(--primary-color)', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', zIndex: 22, pointerEvents: 'none' }}>
-                        {activeProjForHeader}
+                     <div style={{ position: 'absolute', inset: 0, backgroundColor: 'var(--panel-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 22, pointerEvents: 'none' }}>
+                        <div style={{ position: 'absolute', inset: 0, backgroundColor: activeProjForHeader.color, opacity: 0.15 }}></div>
+                        <span style={{ position: 'relative', fontWeight: 500, color: 'var(--text-primary)' }}>{activeProjForHeader.name}</span>
                      </div>
                   )}
-                  {col.name}
+                  {index === 0 ? col.name : <span style={{ color: 'var(--text-secondary)' }}>Столбец {index}</span>}
                 </div>
               );
             });
@@ -552,15 +553,19 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 const actualColIndex = colIndex + 1;
                 const cellData = row.data[col.id] || { text: '', color: '' };
                 const selected = isCellSelected(virtualRow.index, actualColIndex);
+                const activeProjectForCell = activeProjectsContext[col.id]?.[item.originalIndex];
                 
                 const hasLegacyText = cellData.text && !['Выходной', 'Отсыпной', 'СТОП'].includes(cellData.text.trim()) && cellData.text.trim().length > 0;
                 const isWorkingShift = cellData.staff?.length || cellData.dayType || cellData.cars?.length || hasLegacyText;
                 const isWeekend = cellData.text === 'Выходной' || cellData.dayType === 'выходной' || cellData.text === 'Отсыпной' || cellData.dayType === 'отсыпной';
                 const isStop = cellData.text === 'СТОП' || cellData.dayType === 'стоп';
+                const isCellInProject = activeProjectForCell && (isWorkingShift || isWeekend || cellData.cellType === 'shift' || cellData.cellType === 'day_off');
                 
-                let mappedColor = cellData.color ? getDarkThemeColor(cellData.color) : undefined;
+                let mappedColor = cellData.color ? (getDarkThemeColor(cellData.color) || cellData.color) : undefined;
                 if (!mappedColor) {
-                  if (isWeekend) mappedColor = themeSettings.weekendColor;
+                  if (cellData.cellType === 'project_start' || (!cellData.cellType && cellData.projectName)) {
+                     mappedColor = cellData.color || 'var(--primary-color)';
+                  } else if (isWeekend) mappedColor = themeSettings.weekendColor;
                   else if (isStop) mappedColor = themeSettings.stopColor;
                   else if (cellData.dayType === 'павильон') mappedColor = themeSettings.pavilionColor;
                   else if (cellData.dayType === 'склад') mappedColor = themeSettings.warehouseColor;
@@ -594,7 +599,8 @@ export const DataGrid: React.FC<DataGridProps> = ({
                     style={{ 
                       width: col.width,
                       backgroundColor: selected ? undefined : mappedColor,
-                      color: textColor
+                      color: textColor,
+                      position: 'relative'
                     }}
                     onMouseDown={() => handleMouseDown(virtualRow.index, actualColIndex)}
                     onMouseEnter={() => handleMouseEnter(virtualRow.index, actualColIndex)}
@@ -604,9 +610,13 @@ export const DataGrid: React.FC<DataGridProps> = ({
                     {selected && mappedColor && (
                       <div className={styles.selectionOverlay} style={{ backgroundColor: mappedColor }}></div>
                     )}
-                    <span className={styles.cellText}>
+                    {/* Active Project Glow */}
+                    {isCellInProject && activeProjectForCell && cellData.cellType !== 'project_start' && (
+                      <div style={{ position: 'absolute', inset: 0, boxShadow: `inset 0 0 16px ${activeProjectForCell.color}${isWeekend ? '0D' : '1A'}`, pointerEvents: 'none', zIndex: 1, borderRadius: '4px' }}></div>
+                    )}
+                    <span className={styles.cellText} style={{ zIndex: 2 }}>
                       {cellData.cellType === 'project_start' || (!cellData.cellType && cellData.projectName) ? (
-                         <span style={{ fontWeight: 'bold' }}>{cellData.projectName || cellData.text}</span>
+                         <span style={{ fontWeight: 'bold', color: getContrastYIQ(mappedColor) }}>{cellData.projectName || cellData.text}</span>
                       ) : (
                          <>
                            {cellData.staff && cellData.staff.length > 0 ? cellData.staff.join(', ') : cellData.text}

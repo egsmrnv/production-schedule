@@ -21,7 +21,7 @@ interface CellSettingsModalProps {
   columnName: string;
   staffList: string[];
   cars: any[];
-  activeProject: string | null;
+  activeProject: { name: string; color: string } | null;
 }
 
 export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
@@ -94,6 +94,9 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
         {val: 'project_start', label: 'Старт проекта'}
       ];
 
+  const primaryColor = activeProject?.color || 'var(--primary-color)';
+  const glowStyle = activeProject ? `0 0 20px ${activeProject.color}4D` : 'none';
+
   const handleClear = () => {
     setData({ cellType: '' });
   };
@@ -161,18 +164,20 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
 
   return (
     <div className={styles.overlay} onMouseDown={onClose}>
-      <div className={styles.modal} onMouseDown={e => e.stopPropagation()}>
+      <div 
+        className={styles.modal} 
+        onMouseDown={e => e.stopPropagation()}
+        style={{ boxShadow: glowStyle }}
+      >
         <div className={styles.header}>
-          <h2>{date} — {columnName}</h2>
+          <h2>
+            {date}
+            {activeProject && <span style={{ color: primaryColor }}> — {activeProject.name}</span>}
+          </h2>
           <button className={styles.closeBtn} onClick={onClose}>&times;</button>
         </div>
         
         <div className={styles.body}>
-          {activeProject && (
-            <div style={{ marginBottom: '16px', padding: '8px', backgroundColor: 'var(--panel-bg)', borderRadius: '4px', border: '1px solid var(--primary-color)', fontSize: '13px' }}>
-              <strong style={{color: 'var(--primary-color)'}}>Активный проект:</strong> {activeProject}
-            </div>
-          )}
 
           <div className={styles.formGroup}>
             <label>Тип ячейки</label>
@@ -306,7 +311,7 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
           <button className={styles.cancelBtn} style={{ color: 'var(--danger-color)' }} onClick={handleClear}>Очистить ячейку</button>
           <div>
             <button className={styles.cancelBtn} onClick={onClose} style={{ marginRight: '8px' }}>Отмена</button>
-            <button className={styles.saveBtn} onClick={handleSave}>Сохранить</button>
+            <button className={styles.saveBtn} style={{ backgroundColor: primaryColor }} onClick={handleSave}>Сохранить</button>
           </div>
         </div>
       </div>
