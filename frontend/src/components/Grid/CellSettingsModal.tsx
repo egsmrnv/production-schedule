@@ -149,15 +149,15 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
   const handleDayTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newDayType = e.target.value;
     setData(prev => {
-      if (newDayType === 'выходной' || newDayType === 'отсыпной' || newDayType === 'стоп') {
+      if (!newDayType || ['выходной', 'отсыпной', 'стоп'].includes(newDayType)) {
         return { ...prev, dayType: newDayType, staff: [], cars: [], options: [] };
       }
       return { ...prev, dayType: newDayType };
     });
   };
 
-  const isWeekendOrOff = data.dayType === 'выходной' || data.dayType === 'отсыпной' || data.dayType === 'стоп';
-  const disabledStyle = isWeekendOrOff ? { opacity: 0.5, pointerEvents: 'none' as const } : {};
+  const isDisabled = !data.dayType || ['выходной', 'отсыпной', 'стоп'].includes(data.dayType);
+  const disabledStyle = isDisabled ? { opacity: 0.5, pointerEvents: 'none' as const } : {};
 
   return (
     <div className={styles.overlay} onMouseDown={onClose}>
@@ -167,6 +167,20 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
           <button className={styles.closeBtn} onClick={onClose}>&times;</button>
         </div>
         <div className={styles.body}>
+
+          <div className={styles.formGroup}>
+            <label>Тип смены</label>
+            <select 
+              className={styles.select} 
+              value={data.dayType || ''}
+              onChange={handleDayTypeChange}
+            >
+              <option value="">(Не выбран)</option>
+              {dayTypeOptions.map(dt => (
+                <option key={dt} value={dt}>{dt.charAt(0).toUpperCase() + dt.slice(1)}</option>
+              ))}
+            </select>
+          </div>
           
           <div className={styles.formGroup} style={disabledStyle}>
             <label>Сотрудники</label>
@@ -200,20 +214,6 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
                 </label>
               ))}
             </div>
-          </div>
-
-          <div className={styles.formGroup}>
-            <label>Тип дня</label>
-            <select 
-              className={styles.select} 
-              value={data.dayType || ''}
-              onChange={handleDayTypeChange}
-            >
-              <option value="">(Не выбран)</option>
-              {dayTypeOptions.map(dt => (
-                <option key={dt} value={dt}>{dt}</option>
-              ))}
-            </select>
           </div>
 
           <div className={styles.formGroup} style={disabledStyle}>
