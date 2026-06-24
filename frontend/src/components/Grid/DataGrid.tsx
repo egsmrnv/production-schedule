@@ -334,9 +334,16 @@ export const DataGrid: React.FC<DataGridProps> = ({
         style={{ height: `${rowVirtualizer.getTotalSize() + 40}px`, width: `${totalWidth}px` }}
       >
         {/* Header */}
-        <div className={styles.headerRow} style={{ width: `${totalWidth}px` }}>
-          {columns.map(col => (
-            <div key={col.id} className={styles.headerCell} style={{ width: col.width }}>
+        <div className={styles.headerRow}>
+          {columns.map((col, index) => (
+            <div 
+              key={col.id} 
+              className={styles.headerCell} 
+              style={{ 
+                width: col.width,
+                ...(index === 0 ? { position: 'sticky', left: 0, zIndex: 21, backgroundColor: 'var(--panel-bg)', borderRight: '1px solid var(--border-color)' } : {})
+              }}
+            >
               {col.name}
             </div>
           ))}
@@ -366,10 +373,10 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 {/* Date Cell (Sticky) */}
                 <div 
                   className={`${styles.cell} ${styles.dateCell}`}
-                  style={{ width: columns[0].width, zIndex: 10 }}
-              >
-                {row.date}
-              </div>
+                  style={{ width: columns[0].width }}
+                >
+                  {row.date}
+                </div>
 
               {/* Data Columns */}
               {columns.slice(1).map((col, colIndex) => {

@@ -18,7 +18,7 @@
   display: flex;
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 20;
   background-color: var(--panel-bg-translucent);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -71,7 +71,7 @@
   cursor: default;
   position: sticky;
   left: 0;
-  z-index: 1;
+  z-index: 10;
   color: var(--text-secondary);
   border-right: 1px solid var(--border-color);
 }
