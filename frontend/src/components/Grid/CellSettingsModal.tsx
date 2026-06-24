@@ -25,7 +25,7 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
   isOpen, onClose, onSave, initialData, date, columnName, staffList, cars
 }) => {
 
-  const dayTypeOptions = ['натура', 'павильон', 'склад', 'переезд', 'выходной'];
+  const dayTypeOptions = ['натура', 'павильон', 'склад', 'переезд', 'выходной', 'отсыпной'];
   const extraOptions = ['погрузка', 'разгрузка'];
 
   const [data, setData] = useState<StructuredData>({});
@@ -144,15 +144,15 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
   const handleDayTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newDayType = e.target.value;
     setData(prev => {
-      if (newDayType === 'выходной') {
-        return { ...prev, dayType: newDayType, staff: [], cars: [] };
+      if (newDayType === 'выходной' || newDayType === 'отсыпной') {
+        return { ...prev, dayType: newDayType, staff: [], cars: [], options: [] };
       }
       return { ...prev, dayType: newDayType };
     });
   };
 
-  const isWeekend = data.dayType === 'выходной';
-  const disabledStyle = isWeekend ? { opacity: 0.5, pointerEvents: 'none' as const } : {};
+  const isWeekendOrOff = data.dayType === 'выходной' || data.dayType === 'отсыпной';
+  const disabledStyle = isWeekendOrOff ? { opacity: 0.5, pointerEvents: 'none' as const } : {};
 
   return (
     <div className={styles.overlay} onMouseDown={onClose}>
@@ -211,7 +211,7 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
             </select>
           </div>
 
-          <div className={styles.formGroup}>
+          <div className={styles.formGroup} style={disabledStyle}>
             <label>Доп. опции</label>
             <div className={styles.checkboxList}>
               {extraOptions.map(opt => (

@@ -346,7 +346,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 const selected = isCellSelected(virtualRow.index, actualColIndex);
                 
                 const isWorkingShift = cellData.staff?.length || cellData.dayType || cellData.cars?.length;
-                const isWeekend = cellData.text === 'Выходной' || cellData.dayType === 'выходной';
+                const isWeekend = cellData.text === 'Выходной' || cellData.dayType === 'выходной' || cellData.text === 'Отсыпной' || cellData.dayType === 'отсыпной';
                 
                 let mappedColor = cellData.color ? getDarkThemeColor(cellData.color) : undefined;
                 if (isWeekend) {
