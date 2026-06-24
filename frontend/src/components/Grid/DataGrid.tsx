@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { apiClient } from '../../api/client';
-import { CellSettingsModal, StructuredData } from './CellSettingsModal';
+import { CellSettingsModal } from './CellSettingsModal';
 import styles from './DataGrid.module.css';
 
 interface Column {
@@ -19,6 +19,10 @@ interface Row {
 interface CellData {
   text: string;
   color: string;
+  staff?: string[];
+  cars?: string[];
+  dayType?: string;
+  options?: string[];
 }
 
 interface Selection {
@@ -398,7 +402,15 @@ export const DataGrid: React.FC<DataGridProps> = ({
             const col = columns[activeCell.colIndex];
             
             const isoDate = row.rawDate;
-            const fullData = { ...row.data, [col.id]: newData };
+            const fullData = { 
+              ...row.data, 
+              [col.id]: {
+                ...row.data[col.id],
+                ...newData,
+                text: newData.text || '',
+                color: newData.color || ''
+              }
+            };
 
             try {
               await apiClient.put('/schedule', {

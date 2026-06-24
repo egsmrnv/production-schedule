@@ -10,17 +10,6 @@ export const AdminBoard: React.FC = () => {
   const [staffList, setStaffList] = useState<string[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   
-  const cars = [
-    { label: '⬛️ Белый крафтер', color: '#cccccc' },
-    { label: '⚫️ Белый спринтер', color: '#000000' }, // #cccccc is mostly used for grey, let's keep exact string match or generic mapping
-    { label: '🟢 Зеленый спринтер', color: '#b6d7a8' },
-    { label: '🟠 Оранжевый', color: '#fce5cd' }, // or #f6b26b, let's use the one from Google sheet
-  ];
-  // Wait, let's just use exact colors mapped from the CSS parsing earlier: 
-  // #cccccc -> Grey/White sprinter
-  // #b6d7a8 -> Green sprinter
-  // #fff2cc or #fce5cd -> Orange. Let's just bind to specific names.
-  
   const [highlight, setHighlight] = useState<{ text?: string, color?: string, columnId?: string }>({});
 
   const handleDataLoaded = useCallback((cols: any[], rows: any[]) => {
