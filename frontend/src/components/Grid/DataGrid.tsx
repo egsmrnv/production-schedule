@@ -561,17 +561,23 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 const isStop = cellData.text === 'СТОП' || cellData.dayType === 'стоп';
                 const isCellInProject = activeProjectForCell && (isWorkingShift || isWeekend || cellData.cellType === 'shift' || cellData.cellType === 'day_off');
                 
-                let mappedColor = cellData.color ? (getDarkThemeColor(cellData.color) || cellData.color) : undefined;
-                if (!mappedColor) {
-                  if (cellData.cellType === 'project_start' || (!cellData.cellType && cellData.projectName)) {
-                     mappedColor = cellData.color || 'var(--primary-color)';
-                  } else if (isWeekend) mappedColor = themeSettings.weekendColor;
-                  else if (isStop) mappedColor = themeSettings.stopColor;
-                  else if (cellData.dayType === 'павильон') mappedColor = themeSettings.pavilionColor;
-                  else if (cellData.dayType === 'склад') mappedColor = themeSettings.warehouseColor;
-                  else if (cellData.dayType === 'переезд') mappedColor = themeSettings.transferColor;
-                  else if (isWorkingShift) mappedColor = themeSettings.shiftColor;
-                  else mappedColor = themeSettings.emptyCellColor;
+                let mappedColor;
+                if (cellData.cellType === 'project_start' || (!cellData.cellType && cellData.projectName)) {
+                   mappedColor = cellData.color ? (getDarkThemeColor(cellData.color) || cellData.color) : 'var(--primary-color)';
+                } else if (isWeekend) {
+                   mappedColor = themeSettings.weekendColor;
+                } else if (isStop) {
+                   mappedColor = themeSettings.stopColor;
+                } else if (cellData.dayType === 'павильон') {
+                   mappedColor = themeSettings.pavilionColor;
+                } else if (cellData.dayType === 'склад') {
+                   mappedColor = themeSettings.warehouseColor;
+                } else if (cellData.dayType === 'переезд') {
+                   mappedColor = themeSettings.transferColor;
+                } else if (isWorkingShift) {
+                   mappedColor = cellData.color ? (getDarkThemeColor(cellData.color) || cellData.color) : themeSettings.shiftColor;
+                } else {
+                   mappedColor = undefined;
                 }
                 
                 let cellClass = styles.cell;
