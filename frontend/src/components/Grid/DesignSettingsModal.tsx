@@ -82,14 +82,34 @@ export const DesignSettingsModal = ({ isOpen, onClose, onSave, initialSettings }
           </div>
           <div className={styles.field}>
             <label>Размер шрифта (px)</label>
-            <input 
-              type="number" 
-              min="10" 
-              max="24"
-              value={parseInt(settings.fontSize || '13')} 
-              onChange={e => handleChange('fontSize', `${e.target.value}px`)}
-              style={{ width: '60px', padding: '4px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-primary)' }}
-            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button 
+                onClick={() => {
+                  const val = parseInt(settings.fontSize || '13');
+                  if (val > 10) handleChange('fontSize', `${val - 1}px`);
+                }}
+                style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--cell-bg)', color: 'var(--text-primary)', cursor: 'pointer' }}
+              >
+                -
+              </button>
+              <input 
+                type="number" 
+                min="10" 
+                max="24"
+                value={parseInt(settings.fontSize || '13')} 
+                onChange={e => handleChange('fontSize', `${e.target.value}px`)}
+                style={{ width: '50px', padding: '4px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-primary)', textAlign: 'center' }}
+              />
+              <button 
+                onClick={() => {
+                  const val = parseInt(settings.fontSize || '13');
+                  if (val < 24) handleChange('fontSize', `${val + 1}px`);
+                }}
+                style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--cell-bg)', color: 'var(--text-primary)', cursor: 'pointer' }}
+              >
+                +
+              </button>
+            </div>
           </div>
         </div>
         <div className={styles.footer}>

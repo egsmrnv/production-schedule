@@ -15,7 +15,7 @@ async function main() {
   await prisma.user.deleteMany();
 
   // Create an admin user
-  const adminPassword = process.env.ADMIN_PASSWORD || crypto.randomBytes(12).toString('hex');
+  const adminPassword = process.env.ADMIN_PASSWORD || 'admin';
   const passwordHash = await bcrypt.hash(adminPassword, 10);
   
   const admin = await prisma.user.create({
