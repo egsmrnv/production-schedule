@@ -105,6 +105,8 @@ export interface DataGridProps {
   globalProjects?: any[];
   themeSettings?: ThemeSettings;
   gridRef?: React.RefObject<{ addColumn: () => void } | null>;
+  readOnly?: boolean;
+  apiEndpoint?: string;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -119,6 +121,8 @@ export const DataGrid: React.FC<DataGridProps> = ({
   globalProjects = [],
   themeSettings = DEFAULT_THEME,
   gridRef,
+  readOnly = false,
+  apiEndpoint,
 }) => {
   const [columns, setColumns] = useState<Column[]>([{ id: 'date', name: 'Дата', width: 100 }]);
   const [rows, setRows] = useState<Row[]>([]);
@@ -259,7 +263,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
   useEffect(() => {
     const loadData = async () => {
       try {
-        const res = await apiClient.get('/schedule');
+        const res = await apiClient.get(apiEndpoint || '/schedule');
         const dbColumns: any[] = res.data.columns || [];
         const dbDates: any[] = res.data.dates || [];
 
@@ -297,7 +301,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
       }
     };
     loadData();
-  }, [onDataLoaded, shouldReload]);
+  }, [onDataLoaded, shouldReload, apiEndpoint]);
 
   // ─── Scroll to today (on init + on date-cell click) ──────────────────────────
 
@@ -346,6 +350,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
   // ─── Mouse selection ──────────────────────────────────────────────────────────
 
   const handleMouseDown = (rowIdx: number, colIdx: number) => {
+    if (readOnly) return;
     if (colIdx === 0) return;
     
     const isAlreadySelected = selection &&
@@ -363,6 +368,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
   };
 
   const handleMouseEnter = (rowIdx: number, colIdx: number) => {
+    if (readOnly) return;
     if (!isDragging || !selection || colIdx === 0) return;
     setSelection({ ...selection, endRow: rowIdx, endCol: colIdx });
   };
@@ -377,6 +383,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
   // ─── Keyboard: copy ───────────────────────────────────────────────────────────
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (readOnly) return;
     if (!selection || !(e.key === 'c' && (e.metaKey || e.ctrlKey))) return;
     e.preventDefault();
     const { minRow, maxRow, minCol, maxCol } = selectionBounds!;
@@ -405,6 +412,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
   // ─── Paste ────────────────────────────────────────────────────────────────────
 
   const handlePaste = useCallback(async (e: ClipboardEvent) => {
+    if (readOnly) return;
     if (!selection) return;
     const minRow = Math.min(selection.startRow, selection.endRow);
     const minCol = Math.min(selection.startCol, selection.endCol);
@@ -570,22 +578,26 @@ export const DataGrid: React.FC<DataGridProps> = ({
                         {activeProjForHeader.name}
                         {activeProjForHeader.comment && <span style={{ opacity: 0.7, fontSize: '0.9em' }}>({activeProjForHeader.comment})</span>}
                       </span>
-                      <button
-                        onClick={e => { e.stopPropagation(); handleDeleteColumn(col.id); }}
-                        style={{ position: 'absolute', right: '8px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '14px', opacity: 0.5 }}
-                        title="Удалить столбец"
-                      >✕</button>
+                      {!readOnly && (
+                        <button
+                          onClick={e => { e.stopPropagation(); handleDeleteColumn(col.id); }}
+                          style={{ position: 'absolute', right: '8px', background: 'transparent', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '14px', opacity: 0.5 }}
+                          title="Удалить столбец"
+                        >✕</button>
+                      )}
                     </div>
                   ) : index === 0 ? (
                     col.name
                   ) : (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '0 8px' }}>
                       <span style={{ color: 'var(--text-secondary)' }}>Столбец {index}</span>
-                      <button
-                        onClick={e => { e.stopPropagation(); handleDeleteColumn(col.id); }}
-                        style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '14px', opacity: 0.7 }}
-                        title="Удалить столбец"
-                      >✕</button>
+                      {!readOnly && (
+                        <button
+                          onClick={e => { e.stopPropagation(); handleDeleteColumn(col.id); }}
+                          style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '14px', opacity: 0.7 }}
+                          title="Удалить столбец"
+                        >✕</button>
+                      )}
                     </div>
                   )}
                 </div>

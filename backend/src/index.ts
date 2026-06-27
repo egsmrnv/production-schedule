@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -202,13 +203,26 @@ app.delete('/api/admin/projects/:id', requireAdmin, async (req, res) => {
 
 app.get('/api/admin/staff', requireAdmin, async (req, res) => {
   const staff = await prisma.user.findMany({ where: { role: 'STAFF' } });
-  res.json(staff);
+  let updated = false;
+  for (const s of staff) {
+    if (!s.accessToken) {
+      s.accessToken = crypto.randomBytes(16).toString('hex');
+      await prisma.user.update({ where: { id: s.id }, data: { accessToken: s.accessToken } });
+      updated = true;
+    }
+  }
+  if (updated) {
+    res.json(await prisma.user.findMany({ where: { role: 'STAFF' } }));
+  } else {
+    res.json(staff);
+  }
 });
 
 app.post('/api/admin/staff', requireAdmin, async (req, res) => {
   const { name } = req.body;
   try {
-    const staff = await prisma.user.create({ data: { name, role: 'STAFF' } });
+    const accessToken = crypto.randomBytes(16).toString('hex');
+    const staff = await prisma.user.create({ data: { name, role: 'STAFF', accessToken } });
     res.json(staff);
   } catch (error) {
     res.status(500).json({ error: 'Server error' });
@@ -364,27 +378,19 @@ app.get('/api/staff/schedule', async (req, res) => {
     for (const d of dates) {
       const rowData = d.data as Record<string, any>;
       const filteredData: Record<string, any> = {};
-      let hasData = false;
       
       for (const colId in rowData) {
         const cell = rowData[colId];
         if (!cell) continue;
 
-        // Fast path: if staff array exists, check it directly
-        // Real requirement: "сотрудник видит только СВОЕ расписание"
-        if (cell.staff?.includes(staffName)) {
+        if (cell.cellType === 'project_start' || cell.cellType === 'stop' || (!cell.cellType && cell.projectName)) {
           filteredData[colId] = cell;
-          hasData = true;
-        } else if (cell.text?.includes(staffName)) {
-          // Fallback to text search
+        } else if (cell.staff?.includes(staffName) || cell.text?.includes(staffName)) {
           filteredData[colId] = cell;
-          hasData = true;
         }
       }
 
-      if (hasData) {
-        filteredDates.push({ ...d, data: filteredData });
-      }
+      filteredDates.push({ ...d, data: filteredData });
     }
 
     res.json({ staffName: staffUser.name, columns, dates: filteredDates });

@@ -1,34 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
+import { DataGrid } from '../../components/Grid/DataGrid';
+import { type ThemeSettings, DEFAULT_THEME } from '../../components/Grid/DesignSettingsModal';
 import styles from './StaffView.module.css';
-
-interface Column {
-  id: string;
-  name: string;
-}
-
-interface CellData {
-  text: string;
-  color?: string;
-}
-
-interface ScheduleDate {
-  date: string;
-  data: Record<string, CellData>;
-}
-
-interface StaffScheduleData {
-  staffName: string;
-  columns: Column[];
-  dates: ScheduleDate[];
-}
 
 export const StaffView: React.FC = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
-  const [data, setData] = useState<StaffScheduleData | null>(null);
   const [error, setError] = useState('');
+  const [themeSettings, setThemeSettings] = useState<ThemeSettings>(DEFAULT_THEME);
+  const [staffName, setStaffName] = useState('');
 
   useEffect(() => {
     if (!token) {
@@ -36,16 +18,25 @@ export const StaffView: React.FC = () => {
       return;
     }
 
+    // Fetch theme settings for consistent styling
+    apiClient.get('/settings').then(res => {
+      if (res.data && Object.keys(res.data).length > 0) {
+        setThemeSettings({ ...DEFAULT_THEME, ...res.data });
+      }
+    }).catch(console.error);
+
+    // We can also fetch the staff name to display it in the header
     apiClient.get(`/staff/schedule?token=${token}`)
-      .then(res => setData(res.data))
+      .then(res => setStaffName(res.data.staffName))
       .catch(() => setError('Не удалось загрузить расписание. Ссылка устарела или неверна.'));
+
   }, [token]);
 
   if (error) {
     return <div className={styles.errorContainer}>{error}</div>;
   }
 
-  if (!data) {
+  if (!staffName) {
     return <div className={styles.loadingContainer}>Загрузка...</div>;
   }
 
@@ -53,35 +44,14 @@ export const StaffView: React.FC = () => {
     <div className={styles.container}>
       <header className={styles.header}>
         <div className={styles.brand}>Production Schedule</div>
-        <div className={styles.staffName}>{data.staffName}</div>
+        <div className={styles.staffName}>{staffName}</div>
       </header>
-      <div className={styles.content}>
-        <h2>Моё расписание</h2>
-        {data.dates.map((d: ScheduleDate) => (
-          <div key={d.date} className={styles.dateCard}>
-            <div className={styles.dateHeader}>{d.date}</div>
-            <div className={styles.tasks}>
-              {Object.keys(d.data).map(colId => {
-                const column = data.columns.find((c: Column) => c.id === colId);
-                const cell = d.data[colId];
-                return (
-                  <div key={colId} className={styles.taskItem}>
-                    <span className={styles.projectName}>{column?.name}</span>
-                    <span 
-                      className={styles.taskCell} 
-                      style={{ backgroundColor: cell.color || 'transparent' }}
-                    >
-                      {cell.text}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-        {data.dates.length === 0 && (
-          <div className={styles.emptyState}>Нет активных задач в расписании</div>
-        )}
+      <div className={styles.content} style={{ flex: 1, overflow: 'hidden', padding: '0', display: 'flex', flexDirection: 'column' }}>
+        <DataGrid 
+          readOnly={true}
+          apiEndpoint={`/staff/schedule?token=${token}`}
+          themeSettings={themeSettings}
+        />
       </div>
     </div>
   );

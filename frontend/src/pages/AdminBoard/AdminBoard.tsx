@@ -67,10 +67,12 @@ export const AdminBoard: React.FC = () => {
     fetchData();
   };
 
-  const handleDeleteStaff = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDeleteStaff = async (id: string) => {
     if (!window.confirm('Точно удалить сотрудника? Он будет стерт из всей истории.')) return;
     await apiClient.delete(`/admin/staff/${id}`);
+    if (highlight.text === staffList.find(s => s.id === id)?.name) {
+      setHighlight({});
+    }
     fetchData();
   };
 
@@ -145,13 +147,24 @@ export const AdminBoard: React.FC = () => {
         </section>
         <aside className={styles.sidebar}>
           {(highlight.text || highlight.color || highlight.columnId) && (
-            <div className={styles.sidebarSection}>
+            <div className={styles.sidebarSection} style={{ display: 'flex', gap: '8px' }}>
               <button 
                 onClick={() => setHighlight({})} 
-                style={{ width: '100%', padding: '8px', background: 'var(--primary-color)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                style={{ flex: 1, padding: '8px', background: 'var(--primary-color)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
               >
                 Сбросить выделение
               </button>
+              {highlight.text && (
+                <button 
+                  onClick={() => {
+                    const staffUser = staffList.find(s => s.name === highlight.text);
+                    if (staffUser) handleDeleteStaff(staffUser.id);
+                  }} 
+                  style={{ flex: 1, padding: '8px', background: 'var(--danger-color)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  Удалить
+                </button>
+              )}
             </div>
           )}
           
@@ -204,14 +217,25 @@ export const AdminBoard: React.FC = () => {
             {!collapsed.staff && (
               <ul className={styles.staffList} style={{ marginTop: '10px' }}>
                 {staffList.map(s => (
-                  <li 
-                    key={s.id}
-                    style={{ cursor: 'pointer', backgroundColor: highlight.text === s.name ? 'var(--cell-selected)' : 'transparent' }}
-                    onClick={() => setHighlight({ text: s.name })}
-                  >
-                    <span style={{flex: 1}}>{s.name}</span>
-                    <button onClick={(e) => handleDeleteStaff(s.id, e)} style={{ color: 'var(--danger-color)', padding: '0 5px' }}>🗑</button>
-                  </li>
+                    <li 
+                      key={s.id}
+                      style={{ cursor: 'pointer', backgroundColor: highlight.text === s.name ? 'var(--cell-selected)' : 'transparent', display: 'flex', alignItems: 'center' }}
+                      onClick={() => setHighlight({ text: s.name })}
+                    >
+                      <span style={{flex: 1}}>{s.name}</span>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const url = `${window.location.origin}/my-calendar?token=${s.accessToken}`;
+                          navigator.clipboard.writeText(url);
+                          window.open(url, '_blank');
+                        }} 
+                        style={{ color: 'var(--text-secondary)', padding: '0 5px', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                        title="Скопировать и открыть ссылку"
+                      >
+                        🔗
+                      </button>
+                    </li>
                 ))}
               </ul>
             )}
