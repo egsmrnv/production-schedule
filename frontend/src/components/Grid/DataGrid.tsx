@@ -491,7 +491,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
       return cellData.color ? (getDarkThemeColor(cellData.color) ?? cellData.color) : 'var(--primary-color)';
     }
     if (isWeekend) return themeSettings.weekendColor;
-    if (isStop) return activeProject ? activeProject.color : 'var(--danger-color)';
+    if (isStop) return activeProject ? (getDarkThemeColor(activeProject.color) ?? activeProject.color) : 'var(--danger-color)';
     if (cellData.cellType === 'warehouse' || cellData.dayType === 'склад') return themeSettings.warehouseColor;
     if (cellData.cellType === 'relocation' || cellData.dayType === 'переезд') return themeSettings.transferColor;
     if (cellData.dayType === 'павильон') return themeSettings.pavilionColor;
