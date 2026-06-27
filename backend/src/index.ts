@@ -239,29 +239,7 @@ app.put('/api/admin/staff/:id', requireAdmin, async (req, res) => {
     
     const updatedStaff = await prisma.user.update({ where: { id }, data: { name } });
     
-    // Cascade update in JSON using transaction
-    const dates = await prisma.scheduleDate.findMany();
-    const updates = [];
-    for (const d of dates) {
-      let changed = false;
-      const data = d.data as Record<string, any>;
-      for (const colId in data) {
-        if (data[colId].staff && data[colId].staff.includes(staff.name)) {
-          data[colId].staff = data[colId].staff.map((s: string) => s === staff.name ? name : s);
-          data[colId].text = data[colId].staff.join(' '); // fallback text update
-          changed = true;
-        }
-      }
-      if (changed) {
-        updates.push(
-          prisma.scheduleDate.update({ where: { id: d.id }, data: { data } })
-        );
-      }
-    }
-    if (updates.length > 0) {
-      await prisma.$transaction(updates);
-    }
-    
+    // No cascade update needed because we store staff IDs in the JSON history now
     res.json(updatedStaff);
   } catch (error) {
     console.error(error);
@@ -277,16 +255,15 @@ app.delete('/api/admin/staff/:id', requireAdmin, async (req, res) => {
     
     await prisma.user.delete({ where: { id } });
     
-    // Cascade delete in JSON using transaction
+    // Cascade delete in JSON using transaction (check both ID and fallback string name)
     const dates = await prisma.scheduleDate.findMany();
     const updates = [];
     for (const d of dates) {
       let changed = false;
       const data = d.data as Record<string, any>;
       for (const colId in data) {
-        if (data[colId].staff && data[colId].staff.includes(staff.name)) {
-          data[colId].staff = data[colId].staff.filter((s: string) => s !== staff.name);
-          data[colId].text = data[colId].staff.join(' '); // fallback text update
+        if (data[colId].staff && (data[colId].staff.includes(staff.id) || data[colId].staff.includes(staff.name))) {
+          data[colId].staff = data[colId].staff.filter((s: string) => s !== staff.id && s !== staff.name);
           changed = true;
         }
       }
@@ -344,28 +321,7 @@ app.put('/api/admin/cars/:id', requireAdmin, async (req, res) => {
     
     const updatedCar = await prisma.car.update({ where: { id }, data: { label } });
     
-    // Cascade update in JSON using transaction
-    const dates = await prisma.scheduleDate.findMany();
-    const updates = [];
-    for (const d of dates) {
-      let changed = false;
-      const data = d.data as Record<string, any>;
-      for (const colId in data) {
-        if (data[colId].cars && data[colId].cars.includes(car.label)) {
-          data[colId].cars = data[colId].cars.map((c: string) => c === car.label ? label : c);
-          changed = true;
-        }
-      }
-      if (changed) {
-        updates.push(
-          prisma.scheduleDate.update({ where: { id: d.id }, data: { data } })
-        );
-      }
-    }
-    if (updates.length > 0) {
-      await prisma.$transaction(updates);
-    }
-    
+    // No cascade update needed because we store car IDs in the JSON history now
     res.json(updatedCar);
   } catch (error) {
     console.error(error);
@@ -388,8 +344,8 @@ app.delete('/api/admin/cars/:id', requireAdmin, async (req, res) => {
       let changed = false;
       const data = d.data as Record<string, any>;
       for (const colId in data) {
-        if (data[colId].cars && data[colId].cars.includes(car.label)) {
-          data[colId].cars = data[colId].cars.filter((c: string) => c !== car.label);
+        if (data[colId].cars && (data[colId].cars.includes(car.id) || data[colId].cars.includes(car.label))) {
+          data[colId].cars = data[colId].cars.filter((c: string) => c !== car.id && c !== car.label);
           changed = true;
         }
       }
@@ -402,6 +358,7 @@ app.delete('/api/admin/cars/:id', requireAdmin, async (req, res) => {
     if (updates.length > 0) {
       await prisma.$transaction(updates);
     }
+    
     res.json({ success: true });
   } catch (error) {
     console.error(error);
@@ -446,21 +403,24 @@ app.get('/api/staff/schedule', async (req, res) => {
 
   try {
     let entityName = '';
+    let entityId = '';
     let isCar = false;
     
     const staffUser = await prisma.user.findUnique({ where: { accessToken: token } });
 
     if (staffUser && staffUser.isActive) {
       entityName = staffUser.name;
+      entityId = staffUser.id;
     } else {
       const car = await prisma.car.findUnique({ where: { accessToken: token } });
       if (car) {
         entityName = car.label;
+        entityId = car.id;
         isCar = true;
       }
     }
 
-    if (!entityName) {
+    if (!entityId) {
       return res.status(401).json({ error: 'Unauthorized or inactive user/car' });
     }
 
@@ -485,8 +445,8 @@ app.get('/api/staff/schedule', async (req, res) => {
         if (cell.cellType === 'project_start' || cell.cellType === 'stop' || (!cell.cellType && cell.projectName)) {
           filteredData[colId] = cell;
         } else if (
-          (!isCar && (cell.staff?.includes(entityName) || cell.text?.includes(entityName))) ||
-          (isCar && (cell.cars?.includes(entityName) || cell.text?.includes(entityName)))
+          (!isCar && (cell.staff?.includes(entityId) || cell.staff?.includes(entityName) || cell.text?.includes(entityName))) ||
+          (isCar && (cell.cars?.includes(entityId) || cell.cars?.includes(entityName) || cell.text?.includes(entityName)))
         ) {
           filteredData[colId] = cell;
         }
@@ -495,7 +455,10 @@ app.get('/api/staff/schedule', async (req, res) => {
       filteredDates.push({ ...d, data: filteredData });
     }
 
-    res.json({ staffName: entityName, columns, dates: filteredDates });
+    const staffList = await prisma.user.findMany({ select: { id: true, name: true } });
+    const carsList = await prisma.car.findMany({ select: { id: true, label: true } });
+
+    res.json({ staffName: entityName, columns, dates: filteredDates, staffList, cars: carsList });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });

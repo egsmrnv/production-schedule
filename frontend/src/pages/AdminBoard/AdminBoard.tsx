@@ -156,7 +156,7 @@ export const AdminBoard: React.FC = () => {
             highlightText={highlight.text}
             highlightColor={highlight.color}
             highlightColumnId={highlight.columnId}
-            staffList={staffList.map(s => s.name)}
+            staffList={staffList}
             cars={cars}
             globalProjects={globalProjects}
             themeSettings={themeSettings}

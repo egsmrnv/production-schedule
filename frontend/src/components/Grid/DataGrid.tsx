@@ -100,7 +100,7 @@ export interface DataGridProps {
   highlightText?: string;
   highlightColor?: string;
   highlightColumnId?: string;
-  staffList?: string[];
+  staffList?: any[];
   cars?: any[];
   globalProjects?: any[];
   themeSettings?: ThemeSettings;
@@ -124,9 +124,14 @@ export const DataGrid: React.FC<DataGridProps> = ({
   readOnly = false,
   apiEndpoint,
 }) => {
-  const [columns, setColumns] = useState<Column[]>([{ id: 'date', name: 'Дата', width: 100 }]);
+  const [columns, setColumns] = useState<Column[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [localStaffList, setLocalStaffList] = useState<any[]>([]);
+  const [localCars, setLocalCars] = useState<any[]>([]);
+
+  const activeStaffList = staffList || localStaffList;
+  const activeCars = cars || localCars;
   const [activeCell, setActiveCell] = useState<{ rowIndex: number; colIndex: number } | null>(null);
   const [shouldReload, setShouldReload] = useState(0);
   const [collapsedMonths, setCollapsedMonths] = useState<Record<string, boolean>>({});
@@ -266,6 +271,9 @@ export const DataGrid: React.FC<DataGridProps> = ({
         const res = await apiClient.get(apiEndpoint || '/schedule');
         const dbColumns: any[] = res.data.columns || [];
         const dbDates: any[] = res.data.dates || [];
+        
+        if (res.data.staffList) setLocalStaffList(res.data.staffList);
+        if (res.data.cars) setLocalCars(res.data.cars);
 
         const newColumns: Column[] = [
           { id: 'date', name: 'Дата', width: 60 },
@@ -676,10 +684,22 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 let cellClass = styles.cell;
                 if (selected) cellClass += ` ${styles.selected}`;
                 if (highlightText || highlightColor || highlightColumnId) {
-                  const isMatch =
-                    highlightColumnId === col.id ||
-                    (!!highlightText && (cellData.text?.includes(highlightText) || cellData.staff?.includes(highlightText) || cellData.cars?.includes(highlightText))) ||
-                    (!!highlightColor && cellData.color === highlightColor);
+                  let isMatch = false;
+                  if (highlightColumnId === col.id) isMatch = true;
+                  else if (highlightText) {
+                    const textMatch = cellData.text?.includes(highlightText);
+                    const staffMatch = cellData.staff?.some(s => {
+                      const st = activeStaffList?.find(st => st.id === s || st.name === s);
+                      return st ? st.name.includes(highlightText) : s.includes(highlightText);
+                    });
+                    const carMatch = cellData.cars?.some(c => {
+                      const cr = activeCars?.find(cr => cr.id === c || cr.label === c);
+                      return cr ? cr.label.includes(highlightText) : c.includes(highlightText);
+                    });
+                    isMatch = !!textMatch || !!staffMatch || !!carMatch;
+                  } else if (highlightColor) {
+                    isMatch = cellData.color === highlightColor;
+                  }
                   cellClass += isMatch ? ` ${styles.highlighted}` : ` ${styles.dimmed}`;
                 }
 
@@ -705,14 +725,34 @@ export const DataGrid: React.FC<DataGridProps> = ({
                         </span>
                       ) : (
                         <>
-                          {cellData.cars?.map(carLabel => {
-                            // Find corresponding car in latest cars list, or extract from label
-                            const car = cars.find(c => c.label === carLabel);
-                            const emojiMatch = (car?.label || carLabel).match(/^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\S+)/u);
+                          {cellData.cars?.map(carIdOrLabel => {
+                            // Find corresponding car by ID or legacy label
+                            const car = activeCars?.find(c => c.id === carIdOrLabel || c.label === carIdOrLabel);
+                            const emojiMatch = (car?.label || carIdOrLabel).match(/^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\S+)/u);
                             return emojiMatch ? emojiMatch[1] : '';
                           }).join('')}
                           {cellData.cars?.length ? ' ' : ''}
-                          {cellData.text}
+                          {(() => {
+                            if (['shift', 'warehouse', 'relocation'].includes(cellData.cellType || '')) {
+                              let computedText = '';
+                              if (cellData.cellType === 'warehouse' && !cellData.staff?.length) computedText = 'Склад';
+                              else if (cellData.cellType === 'relocation' && !cellData.staff?.length) computedText = 'Переезд';
+                              else if (cellData.staff?.length) {
+                                computedText = cellData.staff.map(idOrName => {
+                                  const st = activeStaffList?.find(s => s.id === idOrName || s.name === idOrName);
+                                  return st ? st.name : idOrName;
+                                }).join(' ');
+                              }
+                              
+                              const brackets = [];
+                              if (cellData.cellType === 'shift' && cellData.dayType) brackets.push(cellData.dayType);
+                              if (cellData.options?.length) brackets.push(...cellData.options);
+                              
+                              if (brackets.length) computedText += (computedText ? ' ' : '') + `[${brackets.join(', ')}]`;
+                              return computedText;
+                            }
+                            return cellData.text; // fallback for legacy, project_start, stop, etc.
+                          })()}
                         </>
                       )}
                     </span>
@@ -732,8 +772,8 @@ export const DataGrid: React.FC<DataGridProps> = ({
           <CellSettingsModal
             isOpen={true}
             onClose={() => setActiveCell(null)}
-            staffList={staffList}
-            cars={cars}
+            staffList={activeStaffList}
+            cars={activeCars}
             globalProjects={globalProjects}
             date={item.row.date}
             columnName={col.name}

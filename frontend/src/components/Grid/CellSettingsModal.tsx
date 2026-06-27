@@ -23,7 +23,7 @@ interface CellSettingsModalProps {
   initialData: StructuredData;
   date: string;
   columnName: string; // kept for API compat, not rendered
-  staffList: string[];
+  staffList: any[];
   cars: any[];
   globalProjects: any[]; // ProjectData[]
   activeProject: { name: string; color: string; comment?: string } | null;
@@ -134,13 +134,13 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
     e.target.value = '';
   };
 
-  const handleRemoveStaff = (name: string) =>
-    setData(prev => ({ ...prev, staff: prev.staff?.filter(s => s !== name) }));
+  const handleRemoveStaff = (idOrName: string) =>
+    setData(prev => ({ ...prev, staff: prev.staff?.filter(s => s !== idOrName) }));
 
-  const toggleCar = (label: string) =>
+  const toggleCar = (carId: string) =>
     setData(prev => {
       const current = prev.cars ?? [];
-      return { ...prev, cars: current.includes(label) ? current.filter(c => c !== label) : [...current, label] };
+      return { ...prev, cars: current.includes(carId) ? current.filter(c => c !== carId) : [...current, carId] };
     });
 
   const toggleOption = (opt: string) =>
@@ -178,7 +178,12 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
     } else if (['shift', 'warehouse', 'relocation'].includes(data.cellType)) {
       if (data.cellType === 'warehouse' && !data.staff?.length) text = 'Склад';
       else if (data.cellType === 'relocation' && !data.staff?.length) text = 'Переезд';
-      else if (data.staff?.length) text = data.staff.join(' ');
+      else if (data.staff?.length) {
+        text = data.staff.map(s => {
+          const st = staffList.find(st => st.id === s || st.name === s);
+          return st ? st.name : s;
+        }).join(' ');
+      }
       
       const brackets = [];
       if (data.cellType === 'shift' && data.dayType) brackets.push(data.dayType);
@@ -275,17 +280,21 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
               <div className={styles.formGroup}>
                 <label>Сотрудники</label>
                 <div className={styles.staffList}>
-                  {data.staff?.map(name => (
-                    <div key={name} className={styles.staffTag}>
-                      {name}
-                      <button className={styles.removeBtn} onClick={() => handleRemoveStaff(name)}>✕</button>
-                    </div>
-                  ))}
+                  {data.staff?.map(idOrName => {
+                    const st = staffList.find(s => s.id === idOrName || s.name === idOrName);
+                    const displayName = st ? st.name : idOrName;
+                    return (
+                      <div key={idOrName} className={styles.staffTag}>
+                        {displayName}
+                        <button className={styles.removeBtn} onClick={() => handleRemoveStaff(idOrName)}>✕</button>
+                      </div>
+                    );
+                  })}
                 </div>
                 <select className={styles.select} onChange={handleAddStaff} value="">
                   <option value="" disabled>+ Добавить сотрудника</option>
-                  {staffList.filter(s => !data.staff?.includes(s)).map(s => (
-                    <option key={s} value={s}>{s}</option>
+                  {staffList.filter(s => !data.staff?.includes(s.id) && !data.staff?.includes(s.name)).map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
               </div>
@@ -295,7 +304,7 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
                 <div className={styles.checkboxList}>
                   {cars.map(car => (
                     <label key={car.id} className={styles.checkboxLabel}>
-                      <input type="checkbox" checked={(data.cars ?? []).includes(car.label)} onChange={() => toggleCar(car.label)} />
+                      <input type="checkbox" checked={(data.cars ?? []).includes(car.id) || (data.cars ?? []).includes(car.label)} onChange={() => toggleCar(car.id)} />
                       {car.label}
                     </label>
                   ))}
