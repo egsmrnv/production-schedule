@@ -43,7 +43,7 @@ async function main() {
   }
   const allStaff = ['Иван Иванов', ...staffNames];
 
-  // Create Cars
+  // Create Equipment
   const carsData = [
     { label: '🚗 Газель', color: '#ffcc00' },
     { label: '🚚 Фургон', color: '#66ccff' },
@@ -112,6 +112,10 @@ async function main() {
             } else {
               text += ` [${dType}]`;
             }
+
+            const carEmojis = shiftCars.map(c => c.match(/^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\S+)/u)?.[1] || '').join('');
+            if (carEmojis) text = carEmojis + ' ' + text;
+
             data[colId] = { cellType, dayType: cellType === 'shift' ? dType : undefined, staff: shiftStaff, cars: shiftCars, text, color: carsData[Math.abs(i) % carsData.length]!.color };
           }
         }
@@ -135,6 +139,10 @@ async function main() {
             if (dType === 'склад') { cellType = 'warehouse'; text += ' [погрузка]'; }
             else if (dType === 'переезд') { cellType = 'relocation'; text += ' [погрузка]'; }
             else { text += ` [${dType}, погрузка]`; }
+
+            const carEmojis = shiftCars.map(c => c.match(/^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\S+)/u)?.[1] || '').join('');
+            if (carEmojis) text = carEmojis + ' ' + text;
+
             data[colId] = { cellType, dayType: cellType === 'shift' ? dType : undefined, staff: shiftStaff, cars: shiftCars, text, color: carsData[Math.abs(i+1) % carsData.length]!.color, options: ['погрузка'] };
           }
         }

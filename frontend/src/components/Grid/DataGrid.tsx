@@ -687,13 +687,12 @@ export const DataGrid: React.FC<DataGridProps> = ({
                     )}
                     <span className={styles.cellText} style={{ zIndex: 2 }}>
                       {isProjectStart ? (
-                        <span style={{ fontWeight: 'bold', color: textColor }}>{cellData.projectName || cellData.text}</span>
+                        <span style={{ fontWeight: 'bold', color: textColor }}>
+                          {cellData.projectName || cellData.text}
+                          {cellData.comment ? ` (${cellData.comment})` : ''}
+                        </span>
                       ) : (
-                        <>
-                          {cellData.staff?.length ? cellData.staff.join(', ') : cellData.text}
-                          {!!cellData.cars?.length && ' 🚗'}
-                          {cellData.dayType && !['выходной', 'отсыпной', 'стоп'].includes(cellData.dayType) && ` [${cellData.dayType}]`}
-                        </>
+                        cellData.text
                       )}
                     </span>
                   </div>

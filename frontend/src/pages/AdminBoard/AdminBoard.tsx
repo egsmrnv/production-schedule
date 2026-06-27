@@ -5,6 +5,7 @@ import styles from './AdminBoard.module.css';
 import { DataGrid } from '../../components/Grid/DataGrid';
 import { DesignSettingsModal, type ThemeSettings, DEFAULT_THEME } from '../../components/Grid/DesignSettingsModal';
 import { ProjectSettingsModal, type ProjectData } from '../../components/Grid/ProjectSettingsModal';
+import { AddEquipmentModal } from '../../components/Grid/AddEquipmentModal';
 
 export const AdminBoard: React.FC = () => {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ export const AdminBoard: React.FC = () => {
   const [themeSettings, setThemeSettings] = useState<ThemeSettings>(DEFAULT_THEME);
   const [isDesignModalOpen, setIsDesignModalOpen] = useState(false);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [isAddEquipmentModalOpen, setIsAddEquipmentModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<ProjectData | null>(null);
   const [collapsed, setCollapsed] = useState({ cars: false, projects: false, staff: false });
 
@@ -72,17 +74,20 @@ export const AdminBoard: React.FC = () => {
     fetchData();
   };
 
-  const handleAddCar = async () => {
-    const label = prompt('Название машины (желательно с эмодзи):');
-    if (!label) return;
-    const color = prompt('Цвет фона ячейки (например #cccccc):', '#cccccc');
+  const handleAddCar = () => {
+    setIsAddEquipmentModalOpen(true);
+  };
+
+  const handleSaveEquipment = async (emoji: string, name: string, color: string) => {
+    const label = `${emoji} ${name}`;
     await apiClient.post('/admin/cars', { label, color });
+    setIsAddEquipmentModalOpen(false);
     fetchData();
   };
 
   const handleDeleteCar = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!window.confirm('Точно удалить машину?')) return;
+    if (!window.confirm('Точно удалить технику?')) return;
     await apiClient.delete(`/admin/cars/${id}`);
     fetchData();
   };
@@ -152,7 +157,7 @@ export const AdminBoard: React.FC = () => {
           
           <div className={styles.sidebarSection}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => toggleCollapse('cars')}>
-              <h3 style={{ margin: 0 }}>Машины {collapsed.cars ? '▼' : '▲'}</h3>
+              <h3 style={{ margin: 0 }}>Техника {collapsed.cars ? '▼' : '▲'}</h3>
               <button onClick={(e) => { e.stopPropagation(); handleAddCar(); }} style={{ fontSize: '16px', color: 'var(--primary-color)' }}>➕</button>
             </div>
             {!collapsed.cars && (
@@ -242,6 +247,12 @@ export const AdminBoard: React.FC = () => {
         onClose={() => setIsProjectModalOpen(false)}
         onSave={handleSaveProject}
         onDelete={handleDeleteProject}
+      />
+      
+      <AddEquipmentModal
+        isOpen={isAddEquipmentModalOpen}
+        onClose={() => setIsAddEquipmentModalOpen(false)}
+        onSave={handleSaveEquipment}
       />
     </div>
   );

@@ -187,6 +187,15 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
       
       if (brackets.length) text += (text ? ' ' : '') + `[${brackets.join(', ')}]`;
 
+      const carEmojis = (data.cars || []).map(carLabel => {
+        const match = carLabel.match(/^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\S+)/u);
+        return match ? match[1] : '';
+      }).join('');
+
+      if (carEmojis) {
+        text = carEmojis + (text ? ` ${text}` : '');
+      }
+
       const carObj = cars.find(c => c.label === data.cars?.[0]);
       if (carObj) color = carObj.color;
     }
@@ -244,7 +253,7 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
                 </select>
               </div>
               <div className={styles.formGroup}>
-                <label>Комментарий к проекту</label>
+                <label>Комментарий к блоку</label>
                 <input
                   type="text"
                   className={styles.select}
@@ -295,7 +304,7 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
               </div>
 
               <div className={styles.formGroup}>
-                <label>Машины</label>
+                <label>Техника</label>
                 <div className={styles.checkboxList}>
                   {cars.map(car => (
                     <label key={car.id} className={styles.checkboxLabel}>
