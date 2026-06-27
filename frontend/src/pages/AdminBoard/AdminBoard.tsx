@@ -146,27 +146,7 @@ export const AdminBoard: React.FC = () => {
           />
         </section>
         <aside className={styles.sidebar}>
-          {(highlight.text || highlight.color || highlight.columnId) && (
-            <div className={styles.sidebarSection} style={{ display: 'flex', gap: '8px' }}>
-              <button 
-                onClick={() => setHighlight({})} 
-                style={{ flex: 1, padding: '8px', background: 'var(--primary-color)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-              >
-                Сбросить выделение
-              </button>
-              {highlight.text && (
-                <button 
-                  onClick={() => {
-                    const staffUser = staffList.find(s => s.name === highlight.text);
-                    if (staffUser) handleDeleteStaff(staffUser.id);
-                  }} 
-                  style={{ flex: 1, padding: '8px', background: 'var(--danger-color)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                >
-                  Удалить
-                </button>
-              )}
-            </div>
-          )}
+          {/* Top highlight bar removed */}
           
           <div className={styles.sidebarSection}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => toggleCollapse('cars')}>
@@ -179,7 +159,7 @@ export const AdminBoard: React.FC = () => {
                   <li 
                     key={c.id}
                     style={{ cursor: 'pointer', opacity: highlight.color === c.color ? 1 : 0.7 }}
-                    onClick={() => setHighlight({ color: c.color })}
+                    onClick={() => setHighlight(highlight.color === c.color ? {} : { color: c.color })}
                   >
                     <span style={{flex: 1}}>{c.label}</span>
                     <button onClick={(e) => handleDeleteCar(c.id, e)} style={{ color: 'var(--danger-color)', padding: '0 5px' }}>🗑</button>
@@ -220,7 +200,7 @@ export const AdminBoard: React.FC = () => {
                     <li 
                       key={s.id}
                       style={{ cursor: 'pointer', backgroundColor: highlight.text === s.name ? 'var(--cell-selected)' : 'transparent', display: 'flex', alignItems: 'center' }}
-                      onClick={() => setHighlight({ text: s.name })}
+                      onClick={() => setHighlight(highlight.text === s.name ? {} : { text: s.name })}
                     >
                       <span style={{flex: 1}}>{s.name}</span>
                       <button 
@@ -235,6 +215,18 @@ export const AdminBoard: React.FC = () => {
                       >
                         🔗
                       </button>
+                      {highlight.text === s.name && (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteStaff(s.id);
+                          }} 
+                          style={{ color: 'var(--danger-color)', padding: '0 5px', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                          title="Удалить сотрудника"
+                        >
+                          🗑
+                        </button>
+                      )}
                     </li>
                 ))}
               </ul>
