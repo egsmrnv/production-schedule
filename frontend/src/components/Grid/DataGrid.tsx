@@ -510,6 +510,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
       style={{
         '--glow-rgb': hexToRgbString(themeSettings.hoverGlowColor),
         '--current-day-rgb': hexToRgbString(themeSettings.currentDayColor || '#30d158'),
+        '--grid-font-size': themeSettings.fontSize || '13px',
       } as any}
     >
       <div

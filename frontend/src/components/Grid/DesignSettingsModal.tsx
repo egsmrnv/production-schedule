@@ -10,6 +10,7 @@ export interface ThemeSettings {
   stopColor: string;
   hoverGlowColor: string;
   currentDayColor: string;
+  fontSize: string;
 }
 
 export const DEFAULT_THEME: ThemeSettings = {
@@ -20,7 +21,8 @@ export const DEFAULT_THEME: ThemeSettings = {
   transferColor: '#1e3c3c',
   stopColor: '#660000',
   hoverGlowColor: '#0a84ff',
-  currentDayColor: '#30d158'
+  currentDayColor: '#30d158',
+  fontSize: '13px'
 };
 
 export const DesignSettingsModal = ({ isOpen, onClose, onSave, initialSettings }: any) => {
@@ -77,6 +79,17 @@ export const DesignSettingsModal = ({ isOpen, onClose, onSave, initialSettings }
           <div className={styles.field}>
             <label>Выделение текущего дня</label>
             <input type="color" value={settings.currentDayColor || '#30d158'} onChange={e => handleChange('currentDayColor', e.target.value)} />
+          </div>
+          <div className={styles.field}>
+            <label>Размер шрифта (px)</label>
+            <input 
+              type="number" 
+              min="10" 
+              max="24"
+              value={parseInt(settings.fontSize || '13')} 
+              onChange={e => handleChange('fontSize', `${e.target.value}px`)}
+              style={{ width: '60px', padding: '4px', borderRadius: '4px', border: '1px solid var(--border-color)', background: 'var(--input-bg)', color: 'var(--text-primary)' }}
+            />
           </div>
         </div>
         <div className={styles.footer}>

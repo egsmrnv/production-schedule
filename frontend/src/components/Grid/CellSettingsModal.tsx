@@ -43,6 +43,8 @@ const detectLegacyCellType = (d: StructuredData, hasActiveProject: boolean): Str
   if (d.dayType === 'выходной' || d.dayType === 'отсыпной' || d.text === 'Выходной' || d.text === 'Отсыпной') return 'day_off';
   if (d.projectName || (d.text && !hasActiveProject && !d.staff?.length && !d.cars?.length)) return 'project_start';
   if (d.staff?.length || d.cars?.length || d.dayType || d.text) return 'shift';
+  
+  if (!hasActiveProject) return 'project_start';
   return '';
 };
 
@@ -154,8 +156,8 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
         text = proj.name;
         color = proj.color;
       } else {
-        text = data.projectName || 'Новый проект';
-        color = data.color || PROJECT_COLORS[Math.floor(Math.random() * PROJECT_COLORS.length)];
+        alert('Пожалуйста, выберите проект из списка.');
+        return;
       }
     } else if (data.cellType === 'stop') {
       text = 'СТОП';
@@ -191,17 +193,19 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
 
         <div className={styles.body}>
           {/* Cell type selector */}
-          <div className={styles.formGroup}>
-            <label>Тип ячейки</label>
-            <select
-              className={styles.select}
-              value={data.cellType || ''}
-              onChange={e => setData({ cellType: e.target.value as any, projectName: data.projectName, color: data.color })}
-            >
-              <option value="" disabled>(Не выбран)</option>
-              {availableTypes.map(t => <option key={t.val} value={t.val}>{t.label}</option>)}
-            </select>
-          </div>
+          {availableTypes.length > 1 && (
+            <div className={styles.formGroup}>
+              <label>Тип ячейки</label>
+              <select
+                className={styles.select}
+                value={data.cellType || ''}
+                onChange={e => setData({ cellType: e.target.value as any, projectName: data.projectName, color: data.color })}
+              >
+                <option value="" disabled>(Не выбран)</option>
+                {availableTypes.map(t => <option key={t.val} value={t.val}>{t.label}</option>)}
+              </select>
+            </div>
+          )}
 
           {/* project_start fields */}
           {data.cellType === 'project_start' && (
