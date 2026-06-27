@@ -1,24 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import styles from './DesignSettingsModal.module.css';
 
-interface AddEquipmentModalProps {
+interface EquipmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (emoji: string, name: string, color: string) => void;
+  onSave: (emoji: string, name: string) => void;
+  initialData?: { emoji: string, name: string } | null;
 }
 
-export const AddEquipmentModal: React.FC<AddEquipmentModalProps> = ({ isOpen, onClose, onSave }) => {
+export const EquipmentModal: React.FC<EquipmentModalProps> = ({ isOpen, onClose, onSave, initialData }) => {
   const [emoji, setEmoji] = useState('🚗');
   const [name, setName] = useState('');
-  const [color, setColor] = useState('#cccccc');
 
   useEffect(() => {
     if (isOpen) {
-      setEmoji('🚗');
-      setName('');
-      setColor('#cccccc');
+      if (initialData) {
+        setEmoji(initialData.emoji);
+        setName(initialData.name);
+      } else {
+        setEmoji('🚗');
+        setName('');
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, initialData]);
 
   if (!isOpen) return null;
 
@@ -26,7 +30,7 @@ export const AddEquipmentModal: React.FC<AddEquipmentModalProps> = ({ isOpen, on
     <div className={styles.overlay} onMouseDown={onClose}>
       <div className={styles.modal} onMouseDown={e => e.stopPropagation()}>
         <div className={styles.header}>
-          <h2>Добавить технику</h2>
+          <h2>{initialData ? 'Редактировать технику' : 'Добавить технику'}</h2>
           <button className={styles.closeBtn} onClick={onClose}>&times;</button>
         </div>
         <div className={styles.body}>
@@ -38,22 +42,24 @@ export const AddEquipmentModal: React.FC<AddEquipmentModalProps> = ({ isOpen, on
             <label>Название</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Например, Экскаватор" />
           </div>
-          <div className={styles.field}>
-            <label>Цвет выделения</label>
-            <input type="color" value={color} onChange={e => setColor(e.target.value)} />
-          </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
             <button 
               onClick={() => {
-                if (!emoji.trim() || !name.trim()) {
+                const trimmedEmoji = emoji.trim();
+                const trimmedName = name.trim();
+                if (!trimmedEmoji || !trimmedName) {
                   alert('Заполните эмодзи и название');
                   return;
                 }
-                onSave(emoji.trim(), name.trim(), color);
+                if ([...trimmedEmoji].length !== 1) {
+                  alert('Эмодзи должен состоять ровно из одного символа');
+                  return;
+                }
+                onSave(trimmedEmoji, trimmedName);
               }}
               style={{ flex: 1, padding: '10px', background: 'var(--primary-color)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
             >
-              Добавить
+              {initialData ? 'Сохранить' : 'Добавить'}
             </button>
           </div>
         </div>

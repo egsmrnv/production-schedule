@@ -33,7 +33,6 @@ interface CellSettingsModalProps {
 
 const SHIFT_DAY_TYPES = ['натура', 'павильон'] as const;
 const EXTRA_OPTIONS = ['погрузка', 'разгрузка'] as const;
-const PROJECT_COLORS = ['#e06666', '#f6b26b', '#ffd966', '#93c47d', '#76a5af', '#9fc5e8', '#8e7cc3', '#c27ba0'];
 
 // ─── Auto-detect cell type from legacy flat data ───────────────────────────────
 
@@ -186,18 +185,6 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
       if (data.options?.length) brackets.push(...data.options);
       
       if (brackets.length) text += (text ? ' ' : '') + `[${brackets.join(', ')}]`;
-
-      const carEmojis = (data.cars || []).map(carLabel => {
-        const match = carLabel.match(/^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\S+)/u);
-        return match ? match[1] : '';
-      }).join('');
-
-      if (carEmojis) {
-        text = carEmojis + (text ? ` ${text}` : '');
-      }
-
-      const carObj = cars.find(c => c.label === data.cars?.[0]);
-      if (carObj) color = carObj.color;
     }
 
     onSave({ ...data, text, color });

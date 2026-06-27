@@ -678,7 +678,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 if (highlightText || highlightColor || highlightColumnId) {
                   const isMatch =
                     highlightColumnId === col.id ||
-                    (!!highlightText && cellData.text?.includes(highlightText)) ||
+                    (!!highlightText && (cellData.text?.includes(highlightText) || cellData.staff?.includes(highlightText) || cellData.cars?.includes(highlightText))) ||
                     (!!highlightColor && cellData.color === highlightColor);
                   cellClass += isMatch ? ` ${styles.highlighted}` : ` ${styles.dimmed}`;
                 }
@@ -704,7 +704,16 @@ export const DataGrid: React.FC<DataGridProps> = ({
                           {cellData.comment ? ` (${cellData.comment})` : ''}
                         </span>
                       ) : (
-                        cellData.text
+                        <>
+                          {cellData.cars?.map(carLabel => {
+                            // Find corresponding car in latest cars list, or extract from label
+                            const car = cars.find(c => c.label === carLabel);
+                            const emojiMatch = (car?.label || carLabel).match(/^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\S+)/u);
+                            return emojiMatch ? emojiMatch[1] : '';
+                          }).join('')}
+                          {cellData.cars?.length ? ' ' : ''}
+                          {cellData.text}
+                        </>
                       )}
                     </span>
                   </div>

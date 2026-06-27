@@ -28,11 +28,11 @@ model ProjectColumn {
 }
 
 model Car {
-  id        String   @id @default(uuid())
-  label     String
-  color     String   @default("#cccccc")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(uuid())
+  label       String
+  accessToken String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model ScheduleDate {

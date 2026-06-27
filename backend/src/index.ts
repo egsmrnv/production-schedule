@@ -229,6 +229,46 @@ app.post('/api/admin/staff', requireAdmin, async (req, res) => {
   }
 });
 
+app.put('/api/admin/staff/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+    
+    const staff = await prisma.user.findUnique({ where: { id } });
+    if (!staff) return res.status(404).json({ error: 'Not found' });
+    
+    const updatedStaff = await prisma.user.update({ where: { id }, data: { name } });
+    
+    // Cascade update in JSON using transaction
+    const dates = await prisma.scheduleDate.findMany();
+    const updates = [];
+    for (const d of dates) {
+      let changed = false;
+      const data = d.data as Record<string, any>;
+      for (const colId in data) {
+        if (data[colId].staff && data[colId].staff.includes(staff.name)) {
+          data[colId].staff = data[colId].staff.map((s: string) => s === staff.name ? name : s);
+          data[colId].text = data[colId].staff.join(' '); // fallback text update
+          changed = true;
+        }
+      }
+      if (changed) {
+        updates.push(
+          prisma.scheduleDate.update({ where: { id: d.id }, data: { data } })
+        );
+      }
+    }
+    if (updates.length > 0) {
+      await prisma.$transaction(updates);
+    }
+    
+    res.json(updatedStaff);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 app.delete('/api/admin/staff/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
@@ -268,15 +308,67 @@ app.delete('/api/admin/staff/:id', requireAdmin, async (req, res) => {
 
 app.get('/api/admin/cars', requireAdmin, async (req, res) => {
   const cars = await prisma.car.findMany();
-  res.json(cars);
+  let updated = false;
+  for (const c of cars) {
+    if (!c.accessToken) {
+      c.accessToken = crypto.randomBytes(16).toString('hex');
+      await prisma.car.update({ where: { id: c.id }, data: { accessToken: c.accessToken } });
+      updated = true;
+    }
+  }
+  if (updated) {
+    res.json(await prisma.car.findMany());
+  } else {
+    res.json(cars);
+  }
 });
 
 app.post('/api/admin/cars', requireAdmin, async (req, res) => {
-  const { label, color } = req.body;
+  const { label } = req.body;
   try {
-    const car = await prisma.car.create({ data: { label, color: color || '#cccccc' } });
+    const accessToken = crypto.randomBytes(16).toString('hex');
+    const car = await prisma.car.create({ data: { label, accessToken } });
     res.json(car);
   } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.put('/api/admin/cars/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { label } = req.body;
+    
+    const car = await prisma.car.findUnique({ where: { id } });
+    if (!car) return res.status(404).json({ error: 'Not found' });
+    
+    const updatedCar = await prisma.car.update({ where: { id }, data: { label } });
+    
+    // Cascade update in JSON using transaction
+    const dates = await prisma.scheduleDate.findMany();
+    const updates = [];
+    for (const d of dates) {
+      let changed = false;
+      const data = d.data as Record<string, any>;
+      for (const colId in data) {
+        if (data[colId].cars && data[colId].cars.includes(car.label)) {
+          data[colId].cars = data[colId].cars.map((c: string) => c === car.label ? label : c);
+          changed = true;
+        }
+      }
+      if (changed) {
+        updates.push(
+          prisma.scheduleDate.update({ where: { id: d.id }, data: { data } })
+        );
+      }
+    }
+    if (updates.length > 0) {
+      await prisma.$transaction(updates);
+    }
+    
+    res.json(updatedCar);
+  } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -353,12 +445,23 @@ app.get('/api/staff/schedule', async (req, res) => {
   }
 
   try {
-    const staffUser = await prisma.user.findUnique({
-      where: { accessToken: token }
-    });
+    let entityName = '';
+    let isCar = false;
+    
+    const staffUser = await prisma.user.findUnique({ where: { accessToken: token } });
 
-    if (!staffUser || !staffUser.isActive) {
-      return res.status(401).json({ error: 'Unauthorized or inactive user' });
+    if (staffUser && staffUser.isActive) {
+      entityName = staffUser.name;
+    } else {
+      const car = await prisma.car.findUnique({ where: { accessToken: token } });
+      if (car) {
+        entityName = car.label;
+        isCar = true;
+      }
+    }
+
+    if (!entityName) {
+      return res.status(401).json({ error: 'Unauthorized or inactive user/car' });
     }
 
     const columns = await prisma.projectColumn.findMany({
@@ -369,11 +472,7 @@ app.get('/api/staff/schedule', async (req, res) => {
       orderBy: { date: 'asc' },
     });
 
-    // Filter data specifically for this staff member
-    // In a real app, we'd only return cells where their name is mentioned
-    // Or just return the whole schedule if it's open for them.
     const filteredDates = [];
-    const staffName = staffUser.name;
 
     for (const d of dates) {
       const rowData = d.data as Record<string, any>;
@@ -385,7 +484,10 @@ app.get('/api/staff/schedule', async (req, res) => {
 
         if (cell.cellType === 'project_start' || cell.cellType === 'stop' || (!cell.cellType && cell.projectName)) {
           filteredData[colId] = cell;
-        } else if (cell.staff?.includes(staffName) || cell.text?.includes(staffName)) {
+        } else if (
+          (!isCar && (cell.staff?.includes(entityName) || cell.text?.includes(entityName))) ||
+          (isCar && (cell.cars?.includes(entityName) || cell.text?.includes(entityName)))
+        ) {
           filteredData[colId] = cell;
         }
       }
@@ -393,7 +495,7 @@ app.get('/api/staff/schedule', async (req, res) => {
       filteredDates.push({ ...d, data: filteredData });
     }
 
-    res.json({ staffName: staffUser.name, columns, dates: filteredDates });
+    res.json({ staffName: entityName, columns, dates: filteredDates });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });

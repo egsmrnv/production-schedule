@@ -5,7 +5,8 @@ import styles from './AdminBoard.module.css';
 import { DataGrid } from '../../components/Grid/DataGrid';
 import { DesignSettingsModal, type ThemeSettings, DEFAULT_THEME } from '../../components/Grid/DesignSettingsModal';
 import { ProjectSettingsModal, type ProjectData } from '../../components/Grid/ProjectSettingsModal';
-import { AddEquipmentModal } from '../../components/Grid/AddEquipmentModal';
+import { EquipmentModal } from '../../components/Grid/EquipmentModal';
+import { StaffModal } from '../../components/Grid/StaffModal';
 
 export const AdminBoard: React.FC = () => {
   const navigate = useNavigate();
@@ -20,8 +21,11 @@ export const AdminBoard: React.FC = () => {
   const [themeSettings, setThemeSettings] = useState<ThemeSettings>(DEFAULT_THEME);
   const [isDesignModalOpen, setIsDesignModalOpen] = useState(false);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
-  const [isAddEquipmentModalOpen, setIsAddEquipmentModalOpen] = useState(false);
+  const [isEquipmentModalOpen, setIsEquipmentModalOpen] = useState(false);
+  const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<ProjectData | null>(null);
+  const [editingCar, setEditingCar] = useState<any | null>(null);
+  const [editingStaff, setEditingStaff] = useState<any | null>(null);
   const [collapsed, setCollapsed] = useState({ cars: false, projects: false, staff: false });
 
   const toggleCollapse = (key: 'cars' | 'projects' | 'staff') => {
@@ -60,10 +64,18 @@ export const AdminBoard: React.FC = () => {
     navigate('/login');
   };
 
-  const handleAddStaff = async () => {
-    const name = prompt('Имя сотрудника:');
-    if (!name) return;
-    await apiClient.post('/admin/staff', { name });
+  const handleAddStaff = () => {
+    setEditingStaff(null);
+    setIsStaffModalOpen(true);
+  };
+
+  const handleSaveStaff = async (name: string) => {
+    if (editingStaff) {
+      await apiClient.put(`/admin/staff/${editingStaff.id}`, { name });
+    } else {
+      await apiClient.post('/admin/staff', { name });
+    }
+    setIsStaffModalOpen(false);
     fetchData();
   };
 
@@ -77,13 +89,18 @@ export const AdminBoard: React.FC = () => {
   };
 
   const handleAddCar = () => {
-    setIsAddEquipmentModalOpen(true);
+    setEditingCar(null);
+    setIsEquipmentModalOpen(true);
   };
 
-  const handleSaveEquipment = async (emoji: string, name: string, color: string) => {
+  const handleSaveEquipment = async (emoji: string, name: string) => {
     const label = `${emoji} ${name}`;
-    await apiClient.post('/admin/cars', { label, color });
-    setIsAddEquipmentModalOpen(false);
+    if (editingCar) {
+      await apiClient.put(`/admin/cars/${editingCar.id}`, { label });
+    } else {
+      await apiClient.post('/admin/cars', { label });
+    }
+    setIsEquipmentModalOpen(false);
     fetchData();
   };
 
@@ -154,15 +171,33 @@ export const AdminBoard: React.FC = () => {
               <button onClick={(e) => { e.stopPropagation(); handleAddCar(); }} style={{ fontSize: '16px', color: 'var(--primary-color)' }}>➕</button>
             </div>
             {!collapsed.cars && (
-              <ul className={styles.legendList} style={{ marginTop: '10px' }}>
+              <ul className={styles.legendList} style={{ marginTop: '10px', userSelect: 'none' }}>
                 {cars.map(c => (
                   <li 
                     key={c.id}
-                    style={{ cursor: 'pointer', opacity: highlight.color === c.color ? 1 : 0.7 }}
-                    onClick={() => setHighlight(highlight.color === c.color ? {} : { color: c.color })}
+                    style={{ cursor: 'pointer', opacity: highlight.text === c.label ? 1 : 0.7 }}
+                    onClick={() => setHighlight(highlight.text === c.label ? {} : { text: c.label })}
                   >
                     <span style={{flex: 1}}>{c.label}</span>
-                    <button onClick={(e) => handleDeleteCar(c.id, e)} style={{ color: 'var(--danger-color)', padding: '0 5px' }}>🗑</button>
+                    {highlight.text === c.label ? (
+                      <>
+                        <button onClick={(e) => { e.stopPropagation(); setEditingCar(c); setIsEquipmentModalOpen(true); }} style={{ padding: '0 5px', background: 'none', border: 'none', cursor: 'pointer' }} title="Редактировать">✏️</button>
+                        <button onClick={(e) => handleDeleteCar(c.id, e)} style={{ color: 'var(--danger-color)', padding: '0 5px', background: 'none', border: 'none', cursor: 'pointer' }} title="Удалить">🗑</button>
+                      </>
+                    ) : (
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const url = `${window.location.origin}/my-calendar?token=${c.accessToken}`;
+                          navigator.clipboard.writeText(url);
+                          window.open(url, '_blank');
+                        }} 
+                        style={{ padding: '0 5px', background: 'none', border: 'none', cursor: 'pointer' }}
+                        title="Скопировать ссылку"
+                      >
+                        🔗
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -175,7 +210,7 @@ export const AdminBoard: React.FC = () => {
               <button onClick={(e) => { e.stopPropagation(); handleAddProject(); }} style={{ fontSize: '16px', color: 'var(--primary-color)' }}>➕</button>
             </div>
             {!collapsed.projects && (
-              <ul className={styles.legendList} style={{ marginTop: '10px' }}>
+              <ul className={styles.legendList} style={{ marginTop: '10px', userSelect: 'none' }}>
                 {globalProjects.map(p => (
                   <li 
                     key={p.id} 
@@ -195,7 +230,7 @@ export const AdminBoard: React.FC = () => {
               <button onClick={(e) => { e.stopPropagation(); handleAddStaff(); }} style={{ fontSize: '16px', color: 'var(--primary-color)' }}>➕</button>
             </div>
             {!collapsed.staff && (
-              <ul className={styles.staffList} style={{ marginTop: '10px' }}>
+              <ul className={styles.staffList} style={{ marginTop: '10px', userSelect: 'none' }}>
                 {staffList.map(s => (
                     <li 
                       key={s.id}
@@ -203,28 +238,23 @@ export const AdminBoard: React.FC = () => {
                       onClick={() => setHighlight(highlight.text === s.name ? {} : { text: s.name })}
                     >
                       <span style={{flex: 1}}>{s.name}</span>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const url = `${window.location.origin}/my-calendar?token=${s.accessToken}`;
-                          navigator.clipboard.writeText(url);
-                          window.open(url, '_blank');
-                        }} 
-                        style={{ color: 'var(--text-secondary)', padding: '0 5px', border: 'none', background: 'transparent', cursor: 'pointer' }}
-                        title="Скопировать и открыть ссылку"
-                      >
-                        🔗
-                      </button>
-                      {highlight.text === s.name && (
+                      {highlight.text === s.name ? (
+                        <>
+                          <button onClick={(e) => { e.stopPropagation(); setEditingStaff(s); setIsStaffModalOpen(true); }} style={{ padding: '0 5px', background: 'none', border: 'none', cursor: 'pointer' }} title="Редактировать">✏️</button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteStaff(s.id); }} style={{ color: 'var(--danger-color)', padding: '0 5px', background: 'none', border: 'none', cursor: 'pointer' }} title="Удалить сотрудника">🗑</button>
+                        </>
+                      ) : (
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteStaff(s.id);
+                            const url = `${window.location.origin}/my-calendar?token=${s.accessToken}`;
+                            navigator.clipboard.writeText(url);
+                            window.open(url, '_blank');
                           }} 
-                          style={{ color: 'var(--danger-color)', padding: '0 5px', border: 'none', background: 'transparent', cursor: 'pointer' }}
-                          title="Удалить сотрудника"
+                          style={{ color: 'var(--text-secondary)', padding: '0 5px', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                          title="Скопировать и открыть ссылку"
                         >
-                          🗑
+                          🔗
                         </button>
                       )}
                     </li>
@@ -265,10 +295,21 @@ export const AdminBoard: React.FC = () => {
         onDelete={handleDeleteProject}
       />
       
-      <AddEquipmentModal
-        isOpen={isAddEquipmentModalOpen}
-        onClose={() => setIsAddEquipmentModalOpen(false)}
+      <EquipmentModal
+        isOpen={isEquipmentModalOpen}
+        onClose={() => setIsEquipmentModalOpen(false)}
         onSave={handleSaveEquipment}
+        initialData={editingCar ? { 
+          emoji: editingCar.label.split(' ')[0], 
+          name: editingCar.label.split(' ').slice(1).join(' ')
+        } : null}
+      />
+
+      <StaffModal
+        isOpen={isStaffModalOpen}
+        onClose={() => setIsStaffModalOpen(false)}
+        onSave={handleSaveStaff}
+        initialName={editingStaff ? editingStaff.name : ''}
       />
     </div>
   );
