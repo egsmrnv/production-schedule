@@ -4,7 +4,7 @@ import styles from './CellSettingsModal.module.css';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface StructuredData {
-  cellType?: 'project_start' | 'shift' | 'day_off' | 'stop' | '';
+  cellType?: 'project_start' | 'shift' | 'day_off' | 'sleep_off' | 'warehouse' | 'relocation' | 'stop' | '';
   projectId?: string;
   comment?: string;
   projectName?: string; // Legacy fallback
@@ -31,16 +31,24 @@ interface CellSettingsModalProps {
 
 // ─── Constants (module-level, never re-created) ────────────────────────────────
 
-const SHIFT_DAY_TYPES = ['натура', 'павильон', 'склад', 'переезд'] as const;
+const SHIFT_DAY_TYPES = ['натура', 'павильон'] as const;
 const EXTRA_OPTIONS = ['погрузка', 'разгрузка'] as const;
 const PROJECT_COLORS = ['#e06666', '#f6b26b', '#ffd966', '#93c47d', '#76a5af', '#9fc5e8', '#8e7cc3', '#c27ba0'];
 
 // ─── Auto-detect cell type from legacy flat data ───────────────────────────────
 
 const detectLegacyCellType = (d: StructuredData, hasActiveProject: boolean): StructuredData['cellType'] => {
-  if (d.cellType) return d.cellType;
+  if (d.cellType) {
+    if (d.cellType as string === 'day_off' && d.dayType === 'отсыпной') return 'sleep_off';
+    if (d.cellType as string === 'shift' && d.dayType === 'склад') return 'warehouse';
+    if (d.cellType as string === 'shift' && d.dayType === 'переезд') return 'relocation';
+    return d.cellType;
+  }
   if (d.dayType === 'стоп' || d.text === 'СТОП') return 'stop';
-  if (d.dayType === 'выходной' || d.dayType === 'отсыпной' || d.text === 'Выходной' || d.text === 'Отсыпной') return 'day_off';
+  if (d.dayType === 'отсыпной' || d.text === 'Отсыпной') return 'sleep_off';
+  if (d.dayType === 'выходной' || d.text === 'Выходной') return 'day_off';
+  if (d.dayType === 'склад' || d.text?.includes('Склад')) return 'warehouse';
+  if (d.dayType === 'переезд' || d.text?.includes('Переезд')) return 'relocation';
   if (d.projectName || (d.text && !hasActiveProject && !d.staff?.length && !d.cars?.length)) return 'project_start';
   if (d.staff?.length || d.cars?.length || d.dayType || d.text) return 'shift';
   
@@ -105,7 +113,10 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
   const availableTypes = activeProject
     ? [
         { val: 'shift', label: 'Смена' },
-        { val: 'day_off', label: 'Выходной / Отсыпной' },
+        { val: 'warehouse', label: 'Склад' },
+        { val: 'relocation', label: 'Переезд' },
+        { val: 'day_off', label: 'Выходной' },
+        { val: 'sleep_off', label: 'Отсыпной' },
         { val: 'stop', label: 'Стоп (Закрыть проект)' },
       ]
     : [{ val: 'project_start', label: 'Старт проекта' }];
@@ -162,11 +173,20 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
     } else if (data.cellType === 'stop') {
       text = 'СТОП';
     } else if (data.cellType === 'day_off') {
-      text = data.dayType === 'отсыпной' ? 'Отсыпной' : 'Выходной';
-    } else if (data.cellType === 'shift') {
-      text = data.staff?.length ? data.staff.join(' ') : '';
-      if (data.dayType) text += ` [${data.dayType}]`;
-      if (data.options?.length) text += ` (${data.options.join(', ')})`;
+      text = 'Выходной';
+    } else if (data.cellType === 'sleep_off') {
+      text = 'Отсыпной';
+    } else if (['shift', 'warehouse', 'relocation'].includes(data.cellType)) {
+      if (data.cellType === 'warehouse' && !data.staff?.length) text = 'Склад';
+      else if (data.cellType === 'relocation' && !data.staff?.length) text = 'Переезд';
+      else if (data.staff?.length) text = data.staff.join(' ');
+      
+      const brackets = [];
+      if (data.cellType === 'shift' && data.dayType) brackets.push(data.dayType);
+      if (data.options?.length) brackets.push(...data.options);
+      
+      if (brackets.length) text += (text ? ' ' : '') + `[${brackets.join(', ')}]`;
+
       const carObj = cars.find(c => c.label === data.cars?.[0]);
       if (carObj) color = carObj.color;
     }
@@ -237,37 +257,24 @@ export const CellSettingsModal: React.FC<CellSettingsModalProps> = ({
             </>
           )}
 
-          {/* day_off sub-type */}
-          {data.cellType === 'day_off' && (
-            <div className={styles.formGroup}>
-              <label>Тип выходного</label>
-              <select
-                className={styles.select}
-                value={data.dayType || 'выходной'}
-                onChange={e => setData(prev => ({ ...prev, dayType: e.target.value }))}
-              >
-                <option value="выходной">Выходной</option>
-                <option value="отсыпной">Отсыпной</option>
-              </select>
-            </div>
-          )}
-
-          {/* shift fields */}
-          {data.cellType === 'shift' && (
+          {/* shift, warehouse, relocation fields */}
+          {['shift', 'warehouse', 'relocation'].includes(data.cellType as any) && (
             <>
-              <div className={styles.formGroup}>
-                <label>Локация</label>
-                <select
-                  className={styles.select}
-                  value={SHIFT_DAY_TYPES.includes(data.dayType as any) ? data.dayType : ''}
-                  onChange={e => setData(prev => ({ ...prev, dayType: e.target.value }))}
-                >
-                  <option value="">(Не выбрано)</option>
-                  {SHIFT_DAY_TYPES.map(dt => (
-                    <option key={dt} value={dt}>{dt.charAt(0).toUpperCase() + dt.slice(1)}</option>
-                  ))}
-                </select>
-              </div>
+              {data.cellType === 'shift' && (
+                <div className={styles.formGroup}>
+                  <label>Локация</label>
+                  <select
+                    className={styles.select}
+                    value={SHIFT_DAY_TYPES.includes(data.dayType as any) ? data.dayType : ''}
+                    onChange={e => setData(prev => ({ ...prev, dayType: e.target.value }))}
+                  >
+                    <option value="">(Не выбрано)</option>
+                    {SHIFT_DAY_TYPES.map(dt => (
+                      <option key={dt} value={dt}>{dt.charAt(0).toUpperCase() + dt.slice(1)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className={styles.formGroup}>
                 <label>Сотрудники</label>

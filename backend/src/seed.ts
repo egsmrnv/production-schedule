@@ -72,7 +72,7 @@ async function main() {
   const colsData = ['Основная съемочная', 'Вторая группа', 'Подготовка', 'Постпродакшн'];
   const columns = [];
   for (let i = 0; i < colsData.length; i++) {
-    columns.push(await prisma.projectColumn.create({ data: { name: colsData[i], order: i } }));
+    columns.push(await prisma.projectColumn.create({ data: { name: colsData[i]!, order: i } }));
   }
 
   // Generate Schedule Dates (dense data)
@@ -88,22 +88,31 @@ async function main() {
     
     // Fill columns
     for (let c = 0; c < columns.length; c++) {
-      const colId = columns[c].id;
+      const colId = columns[c]!.id;
       
       // Column 0: Project 0, running from i=-5 to i=10
       if (c === 0) {
         if (i === -5) {
-          data[colId] = { cellType: 'project_start', projectId: projects[0].id, text: projects[0].name, color: projects[0].color, comment: 'Начало съемок' };
+          data[colId] = { cellType: 'project_start', projectId: projects[0]!.id, text: projects[0]!.name, color: projects[0]!.color, comment: 'Начало съемок' };
         } else if (i === 10) {
           data[colId] = { cellType: 'stop', text: 'СТОП' };
         } else if (i > -5 && i < 10) {
           if (i % 7 === 0 || i % 7 === 1) { // Weekend
             data[colId] = { cellType: 'day_off', dayType: 'выходной', text: 'Выходной' };
           } else {
-            const shiftStaff = [allStaff[Math.abs(i + c) % allStaff.length], allStaff[Math.abs(i + c + 1) % allStaff.length]];
-            const shiftCars = [carsData[Math.abs(i) % carsData.length].label];
-            const dType = dayTypes[Math.abs(i) % dayTypes.length];
-            data[colId] = { cellType: 'shift', dayType: dType, staff: shiftStaff, cars: shiftCars, text: shiftStaff.join(' ') + ` [${dType}]`, color: carsData[Math.abs(i) % carsData.length].color };
+            const shiftStaff = [allStaff[Math.abs(i + c) % allStaff.length]!, allStaff[Math.abs(i + c + 1) % allStaff.length]!];
+            const shiftCars = [carsData[Math.abs(i) % carsData.length]!.label];
+            const dType = dayTypes[Math.abs(i) % dayTypes.length]!;
+            let cellType = 'shift';
+            let text = shiftStaff.join(' ');
+            if (dType === 'склад') {
+              cellType = 'warehouse';
+            } else if (dType === 'переезд') {
+              cellType = 'relocation';
+            } else {
+              text += ` [${dType}]`;
+            }
+            data[colId] = { cellType, dayType: cellType === 'shift' ? dType : undefined, staff: shiftStaff, cars: shiftCars, text, color: carsData[Math.abs(i) % carsData.length]!.color };
           }
         }
       }
@@ -111,17 +120,22 @@ async function main() {
       // Column 1: Project 1, running from i=0 to i=15
       if (c === 1) {
         if (i === 0) {
-          data[colId] = { cellType: 'project_start', projectId: projects[1].id, text: projects[1].name, color: projects[1].color };
+          data[colId] = { cellType: 'project_start', projectId: projects[1]!.id, text: projects[1]!.name, color: projects[1]!.color };
         } else if (i === 15) {
           data[colId] = { cellType: 'stop', text: 'СТОП' };
         } else if (i > 0 && i < 15) {
           if (i % 6 === 0) {
-            data[colId] = { cellType: 'day_off', dayType: 'отсыпной', text: 'Отсыпной' };
+            data[colId] = { cellType: 'sleep_off', text: 'Отсыпной' };
           } else {
-            const shiftStaff = [allStaff[Math.abs(i + 3) % allStaff.length]];
-            const shiftCars = [carsData[Math.abs(i+1) % carsData.length].label];
-            const dType = dayTypes[Math.abs(i+1) % dayTypes.length];
-            data[colId] = { cellType: 'shift', dayType: dType, staff: shiftStaff, cars: shiftCars, text: shiftStaff.join(' ') + ` [${dType}]`, color: carsData[Math.abs(i+1) % carsData.length].color, options: ['погрузка'] };
+            const shiftStaff = [allStaff[Math.abs(i + 3) % allStaff.length]!];
+            const shiftCars = [carsData[Math.abs(i+1) % carsData.length]!.label];
+            const dType = dayTypes[Math.abs(i+1) % dayTypes.length]!;
+            let cellType = 'shift';
+            let text = shiftStaff.join(' ');
+            if (dType === 'склад') { cellType = 'warehouse'; text += ' [погрузка]'; }
+            else if (dType === 'переезд') { cellType = 'relocation'; text += ' [погрузка]'; }
+            else { text += ` [${dType}, погрузка]`; }
+            data[colId] = { cellType, dayType: cellType === 'shift' ? dType : undefined, staff: shiftStaff, cars: shiftCars, text, color: carsData[Math.abs(i+1) % carsData.length]!.color, options: ['погрузка'] };
           }
         }
       }
@@ -129,11 +143,10 @@ async function main() {
       // Column 2: Project 2 starts later
       if (c === 2) {
         if (i === 5) {
-          data[colId] = { cellType: 'project_start', projectId: projects[2].id, text: projects[2].name, color: projects[2].color };
+          data[colId] = { cellType: 'project_start', projectId: projects[2]!.id, text: projects[2]!.name, color: projects[2]!.color };
         } else if (i > 5 && i <= 20) {
-          const shiftStaff = [allStaff[Math.abs(i + 5) % allStaff.length]];
-          const dType = 'склад';
-          data[colId] = { cellType: 'shift', dayType: dType, staff: shiftStaff, text: shiftStaff.join(' ') + ` [${dType}]` };
+          const shiftStaff = [allStaff[Math.abs(i + 5) % allStaff.length]!];
+          data[colId] = { cellType: 'warehouse', staff: shiftStaff, text: shiftStaff.join(' ') };
         }
       }
     }

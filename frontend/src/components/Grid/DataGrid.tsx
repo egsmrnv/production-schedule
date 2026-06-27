@@ -486,15 +486,15 @@ export const DataGrid: React.FC<DataGridProps> = ({
 
   // ─── Cell color resolver ──────────────────────────────────────────────────────
 
-  const resolveCellColor = (cellData: CellData, isWeekend: boolean, isStop: boolean, isWorkingShift: boolean): string | undefined => {
+  const resolveCellColor = (cellData: CellData, isWeekend: boolean, isStop: boolean, isWorkingShift: boolean, activeProject: { color: string } | null): string | undefined => {
     if (cellData.cellType === 'project_start' || (!cellData.cellType && cellData.projectName)) {
       return cellData.color ? (getDarkThemeColor(cellData.color) ?? cellData.color) : 'var(--primary-color)';
     }
     if (isWeekend) return themeSettings.weekendColor;
-    if (isStop) return themeSettings.stopColor;
+    if (isStop) return activeProject ? activeProject.color : 'var(--danger-color)';
+    if (cellData.cellType === 'warehouse' || cellData.dayType === 'склад') return themeSettings.warehouseColor;
+    if (cellData.cellType === 'relocation' || cellData.dayType === 'переезд') return themeSettings.transferColor;
     if (cellData.dayType === 'павильон') return themeSettings.pavilionColor;
-    if (cellData.dayType === 'склад') return themeSettings.warehouseColor;
-    if (cellData.dayType === 'переезд') return themeSettings.transferColor;
     if (isWorkingShift) return cellData.color ? (getDarkThemeColor(cellData.color) ?? cellData.color) : themeSettings.shiftColor;
     return undefined;
   };
@@ -646,18 +646,18 @@ export const DataGrid: React.FC<DataGridProps> = ({
                 const isProjectStart = cellData.cellType === 'project_start' || (!cellData.cellType && !!cellData.projectName);
                 const trimmedText = cellData.text?.trim() ?? '';
                 // Legacy "weekend" cells may include notes like "Выходной (ОТМЕНА СМЕНЫ)"
-                const isWeekend = cellData.cellType === 'day_off'
+                const isWeekend = cellData.cellType === 'day_off' || cellData.cellType === 'sleep_off'
                   || cellData.dayType === 'выходной' || cellData.dayType === 'отсыпной'
                   || trimmedText === 'Выходной' || trimmedText === 'Отсыпной'
                   || trimmedText.startsWith('Выходной') || trimmedText.startsWith('Отсыпной');
-                const isStop = cellData.text === 'СТОП' || cellData.dayType === 'стоп' || trimmedText === '— СТОП —';
+                const isStop = cellData.cellType === 'stop' || cellData.text === 'СТОП' || cellData.dayType === 'стоп' || trimmedText === '— СТОП —';
                 const hasLegacyText = !!trimmedText
                   && !isWeekend && !isStop
                   && trimmedText.length > 0;
-                const isWorkingShift = cellData.cellType === 'shift' || !!cellData.staff?.length || !!cellData.dayType || !!cellData.cars?.length || hasLegacyText;
+                const isWorkingShift = cellData.cellType === 'shift' || cellData.cellType === 'warehouse' || cellData.cellType === 'relocation' || !!cellData.staff?.length || !!cellData.dayType || !!cellData.cars?.length || hasLegacyText;
                 const isCellInProject = !!activeProjectForCell && !isProjectStart && (isWorkingShift || isWeekend);
 
-                const mappedColor = resolveCellColor(cellData, isWeekend, isStop, isWorkingShift);
+                const mappedColor = resolveCellColor(cellData, isWeekend, isStop, isWorkingShift, activeProjectForCell);
                 const textColor = selected ? undefined : getContrastYIQ(mappedColor);
 
                 // Highlight filter
